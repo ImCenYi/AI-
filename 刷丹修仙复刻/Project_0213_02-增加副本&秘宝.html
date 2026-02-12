@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指数修仙：丹药无双 (副本增强版)</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-main: #e0e0e0;
+            --text-muted: #888;
+            --accent: #4caf50;
+            --danger: #f44336;
+            
+            /* Quality Colors */
+            --q-green: #4caf50;
+            --q-blue: #2196f3;
+            --q-purple: #9c27b0;
+            --q-gold: #ffc107;
+            --q-red: #f44336;
+            
+            /* Treasure Ranks */
+            --t-n: #b0b0b0;
+            --t-r: #4caf50;
+            --t-sr: #03a9f4;
+            --t-ssr: #ffc107;
+            --t-ur: #ff3d00;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Top Bar */
+        header {
+            background: #000;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #333;
+        }
+
+        h1 { margin: 0; font-size: 1.2rem; color: #ffd700; }
+        .difficulty-badge {
+            background: #333;
+            padding: 5px 15px;
+            border-radius: 20px;
+            border: 1px solid #555;
+            font-weight: bold;
+        }
+
+        /* Main Layout */
+        #game-container {
+            display: grid;
+            grid-template-columns: 320px 1fr 360px;
+            flex: 1;
+            gap: 10px;
+            padding: 10px;
+            height: calc(100vh - 60px);
+        }
+
+        /* Panels */
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .panel-title {
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: #ccc;
+            text-align: center;
+        }
+
+        /* Tabs System */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #444;
+            margin-bottom: 10px;
+            gap: 2px;
+        }
+        .tab-btn {
+            flex: 1 0 40%;
+            padding: 6px;
+            background: #2a2a2a;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+        .tab-btn.active {
+            background: #444;
+            color: #fff;
+            font-weight: bold;
+            border-bottom: 2px solid var(--accent);
+        }
+        .tab-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            height: 100%;
+        }
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Stats & Equip */
+        .stat-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 0.9rem; }
+        .val { color: var(--accent); font-family: monospace; }
+        
+        .equip-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            margin-top: 15px;
+        }
+        
+        .equip-slot {
+            aspect-ratio: 1;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s;
+            text-align: center;
+            padding: 2px;
+            overflow: hidden;
+        }
+        .equip-slot:hover { border-color: #888; background: #333; }
+        .equip-slot.empty { color: #555; }
+        .equip-icon { font-size: 1.2rem; margin-bottom: 2px; }
+
+        /* Combat Scene */
+        .combat-scene {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            padding-top: 20px;
+        }
+
+        .enemy-container {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            row-gap: 40px;
+            width: 90%;
+            justify-items: center;
+            margin-bottom: 20px;
+            min-height: 200px;
+            margin-top: 20px;
+        }
+
+        .entity {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s;
+        }
+
+        .enemy-entity { background: radial-gradient(circle, #f44336, #b71c1c); border: 2px solid #ef5350; }
+        .boss-entity { 
+            background: radial-gradient(circle, #9c27b0, #4a148c); 
+            border: 3px solid #ffeb3b; 
+            width: 90px; height: 90px; font-size: 2.5rem; 
+            box-shadow: 0 0 30px #9c27b0; 
+            z-index: 10;
+            grid-column: span 1;
+            animation: pulse 2s infinite;
+            margin-top: -15px;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); box-shadow: 0 0 20px #9c27b0; }
+            50% { transform: scale(1.05); box-shadow: 0 0 40px #e040fb; }
+            100% { transform: scale(1); box-shadow: 0 0 20px #9c27b0; }
+        }
+
+        .player-entity { 
+            width: 80px; height: 80px; 
+            background: radial-gradient(circle, #2196f3, #0d47a1); 
+            border: 2px solid #64b5f6;
+            margin-top: auto; 
+            margin-bottom: 10px;
+            transition: filter 0.3s;
+        }
+
+        .player-dead { filter: grayscale(100%) blur(2px); opacity: 0.6; }
+
+        .hp-bar-container {
+            position: absolute;
+            bottom: -10px;
+            width: 120%;
+            height: 6px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .hp-bar-fill { height: 100%; background: #4caf50; transition: width 0.2s; }
+        .enemy-hp { background: #f44336; }
+        .boss-hp { background: #e040fb; }
+
+        .enemy-stats {
+            position: absolute;
+            top: -35px;
+            width: 150px;
+            text-align: center;
+            font-size: 0.75rem;
+            line-height: 1.2;
+            color: #fff;
+            text-shadow: 1px 1px 2px #000;
+            pointer-events: none;
+            z-index: 20;
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        .damage-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.2rem;
+            pointer-events: none;
+            animation: floatUp 0.8s forwards;
+            text-shadow: 1px 1px 0 #000;
+            z-index: 100;
+            width: 100px;
+            text-align: center;
+        }
+        
+        .skill-text {
+            position: absolute;
+            font-weight: bold;
+            font-size: 1.5rem;
+            color: #ffd700;
+            text-shadow: 0 0 10px red;
+            animation: popIn 0.5s forwards;
+            z-index: 150;
+            top: 40%;
+            width: 100%;
+            text-align: center;
+        }
+
+        .resurrect-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f44336;
+            font-size: 2rem;
+            font-weight: bold;
+            z-index: 200;
+            display: none;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-40px); opacity: 0; }
+        }
+        
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(1); opacity: 0; }
+        }
+
+        #battle-log {
+            height: 120px;
+            background: #000;
+            border: 1px solid #333;
+            padding: 5px;
+            font-size: 0.8rem;
+            font-family: monospace;
+            overflow-y: scroll;
+            margin-top: auto;
+            width: 100%;
+            box-sizing: border-box;
+            color: #aaa;
+        }
+
+        .log-entry { margin: 2px 0; }
+        .log-damage { color: #ff5252; }
+        .log-gain { color: #69f0ae; }
+        .log-sys { color: #ffd740; }
+        .log-skill { color: #ffeb3b; font-weight: bold; }
+
+        .controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        button {
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+            transition: all 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-boss { background: linear-gradient(45deg, #d32f2f, #b71c1c); color: white; }
+        .btn-boss.auto-active {
+            background: linear-gradient(45deg, #e040fb, #7b1fa2);
+            box-shadow: 0 0 10px #e040fb;
+            border: 1px solid #fff;
+        }
+        
+        /* System Styles */
+        .system-section {
+            border: 1px solid #444;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            background: #252525;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .sys-btn {
+            width: 100%;
+            padding: 8px;
+            font-size: 0.9rem;
+            margin: 5px 0;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-tower { background: linear-gradient(to right, #1a237e, #3f51b5); }
+        .btn-tower.active { background: linear-gradient(to right, #b71c1c, #f44336); border-color: #ff5252; }
+        
+        .btn-dungeon { background: linear-gradient(to right, #e65100, #ff9800); }
+        .btn-dungeon.active { background: linear-gradient(to right, #bf360c, #d84315); border: 2px solid #ffab91; }
+
+        .btn-cultivate { background: linear-gradient(to right, #006064, #00bcd4); }
+        .btn-cultivate-all { background: linear-gradient(to right, #004d40, #00695c); font-size: 0.9rem; }
+        .btn-treasure { background: linear-gradient(to right, #4a148c, #7b1fa2); }
+        
+        .res-display {
+            font-size: 1.1rem;
+            color: #00e676;
+            text-align: center;
+            margin-bottom: 10px;
+            font-family: monospace;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .sub-stat {
+            font-size: 0.8rem;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .highlight { color: #ffeb3b; }
+
+        /* Quality Styles */
+        .q-1 { color: var(--q-green); border-color: var(--q-green); }
+        .q-2 { color: var(--q-blue); border-color: var(--q-blue); }
+        .q-3 { color: var(--q-purple); border-color: var(--q-purple); }
+        .q-4 { color: var(--q-gold); border-color: var(--q-gold); box-shadow: 0 0 5px var(--q-gold); }
+        .q-5 { color: var(--q-red); border-color: var(--q-red); box-shadow: 0 0 8px var(--q-red); }
+
+        /* Treasure Styles */
+        .t-n { color: var(--t-n); border-color: var(--t-n); }
+        .t-r { color: var(--t-r); border-color: var(--t-r); }
+        .t-sr { color: var(--t-sr); border-color: var(--t-sr); }
+        .t-ssr { color: var(--t-ssr); border-color: var(--t-ssr); box-shadow: 0 0 5px var(--t-ssr); }
+        .t-ur { color: var(--t-ur); border-color: var(--t-ur); box-shadow: 0 0 10px var(--t-ur); animation: pulse 1s infinite; }
+
+        .treasure-bag-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+            margin-top: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #333;
+            padding: 4px;
+            background: #111;
+        }
+        
+        .locked-icon {
+            position: absolute;
+            top: 1px;
+            right: 1px;
+            font-size: 0.8rem;
+        }
+
+        /* Modal */
+        #item-modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: #222;
+            border: 1px solid #555;
+            padding: 20px;
+            border-radius: 8px;
+            width: 300px;
+            text-align: center;
+        }
+        .modal-btn {
+            padding: 8px 15px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+        }
+        .btn-use { background: #4caf50; }
+        .btn-close { background: #666; }
+        .btn-lock { background: #ff9800; }
+        .btn-split { background: #f44336; }
+
+        @media (max-width: 900px) {
+            #game-container { grid-template-columns: 1fr; overflow-y: scroll; height: auto; }
+            .panel { height: auto; max-height: 400px; }
+            .combat-scene { min-height: 300px; }
+            .enemy-container { grid-template-columns: repeat(5, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>指数修仙：丹药无双 (副本秘宝版)</h1>
+    <div class="difficulty-badge" id="level-display">荒野层数: 0 (凡人)</div>
+</header>
+
+<div id="game-container">
+    <!-- Left Panel: Stats & Equipment -->
+    <div class="panel">
+        <div class="panel-title">修士属性</div>
+        <div class="stat-row"><span>生命值:</span> <span id="stat-hp" class="val">100 / 100</span></div>
+        <div class="stat-row"><span>攻击力:</span> <span id="stat-atk" class="val">10</span></div>
+        <div class="stat-row"><span>暴击率:</span> <span id="stat-crit" class="val">0%</span></div>
+        
+        <div class="panel-title" style="margin-top:10px;">加成统计</div>
+        <div class="stat-row"><span>法则倍率:</span> <span id="mul-atk" class="val">100%</span> (攻/血)</div>
+        <div class="stat-row"><span>通天塔掉率:</span> <span id="mul-drop" class="val">0%</span></div>
+        <div class="stat-row"><span>秘宝加成:</span> <span id="bonus-treasure" class="val" style="font-size:0.8rem">无</span></div>
+
+        <div class="panel-title" style="margin-top:10px;">装备 (自动替换)</div>
+        <div class="equip-grid" id="equip-grid">
+            <!-- Generated by JS -->
+        </div>
+    </div>
+
+    <!-- Center Panel: Combat -->
+    <div class="panel" style="position: relative;">
+        <div class="panel-title" id="stage-name">荒野 - 第 0 层</div>
+        
+        <div class="combat-scene">
+            <div id="damage-overlay" style="position:absolute; width:100%; height:100%; pointer-events:none;"></div>
+            <div id="skill-overlay" style="position:absolute; width:100%; height:100%; pointer-events:none;"></div>
+            
+            <div id="resurrect-overlay" class="resurrect-overlay">
+                <div id="resurrect-text">已死亡<br><span style="font-size:1rem; color:#fff;">2秒后复活...</span></div>
+            </div>
+
+            <!-- Enemy Grid Container -->
+            <div class="enemy-container" id="enemy-container">
+                <!-- Enemies injected here -->
+            </div>
+            
+            <div style="height: 30px; text-align: center; color: #555; font-size: 0.8rem; display: flex; align-items: center;">
+                VS
+            </div>
+
+            <!-- Player -->
+            <div class="entity player-entity" id="player-entity">
+                <span>🧘</span>
+                <div class="hp-bar-container">
+                    <div class="hp-bar-fill" id="player-hp-bar" style="width: 100%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <!-- Modified Button -->
+            <button class="btn-boss" id="btn-challenge" 
+                onclick="game.manualSummonBoss()" 
+                oncontextmenu="event.preventDefault(); game.toggleAutoBoss()">
+                💀 召唤荒野BOSS (右键自动)
+            </button>
+        </div>
+        
+        <div id="battle-log"></div>
+    </div>
+
+    <!-- Right Panel: Game Systems -->
+    <div class="panel">
+        <div class="panel-title">游戏系统</div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="game.switchTab('law')">法则修炼</button>
+            <button class="tab-btn" onclick="game.switchTab('tower')">通天塔</button>
+            <button class="tab-btn" onclick="game.switchTab('dungeon')">副本挑战</button>
+            <button class="tab-btn" onclick="game.switchTab('treasure')">秘宝系统</button>
+        </div>
+
+        <!-- Law Cultivation Tab -->
+        <div id="tab-law" class="tab-content active">
+            <div class="res-display">法则真意: <span id="res-law">0</span></div>
+            <div class="system-section">
+                <div class="sub-stat">当前轮次: <span id="cult-round" class="val">0</span></div>
+                <div class="sub-stat">修炼进度: <span id="cult-step" class="val">0 / 10</span></div>
+                <div class="sub-stat">下次加成: <span id="cult-next" class="highlight">攻击 +10%</span></div>
+                <div class="sub-stat">单次消耗: <span id="cult-cost">2</span></div>
+                <div style="display:flex; gap:5px; margin-top:10px;">
+                    <button class="sys-btn btn-cultivate" onclick="game.cultivate()">✨ 感悟法则</button>
+                    <button class="sys-btn btn-cultivate-all" onclick="game.cultivateAll()">⚡ 一键感悟</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tower Tab -->
+        <div id="tab-tower" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#3f51b5;">通天塔</div>
+                <div class="sub-stat">当前层数: <span id="tower-lv" class="val">0</span></div>
+                <div class="sub-stat">怪物强度: <span class="highlight">10^层数</span> (极难)</div>
+                <div class="sub-stat">掉落真意: <span id="tower-drop">1</span></div>
+                <button class="sys-btn btn-tower" id="btn-tower-toggle" onclick="game.toggleTowerMode()">🗼 挑战通天塔</button>
+            </div>
+        </div>
+
+        <!-- Dungeon Tab -->
+        <div id="tab-dungeon" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#e65100;">血色副本</div>
+                <div class="sub-stat">副本难度: <span id="dungeon-lv" class="val">1</span></div>
+                <div class="sub-stat">当前进度: <span id="dungeon-status">未开启</span></div>
+                <div class="sub-stat">自动倒计时: <span id="dungeon-timer">--</span></div>
+                <button class="sys-btn btn-dungeon" id="btn-dungeon-toggle" onclick="game.toggleDungeonMode()">🔥 进入副本</button>
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 伤害数值压缩: (log伤害)^2。<br>
+                    * 波次机制: 3波敌人，波次内延迟刷新。<br>
+                    * 通关获得秘宝开启资格。<br>
+                    * 死亡15s复活，30s自动下一轮。
+                </div>
+            </div>
+        </div>
+
+        <!-- Treasure Tab -->
+        <div id="tab-treasure" class="tab-content">
+            <div class="system-section" style="padding-bottom: 50px;">
+                <div class="res-display" style="border:none; color:#7b1fa2;">秘宝阁</div>
+                <div class="sub-stat">开启次数: <span id="treasure-daily">20 / 20</span></div>
+                <div class="sub-stat">秘宝碎片: <span id="treasure-frags">0</span></div>
+                
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <button class="sys-btn btn-treasure" onclick="game.openTreasureBox(1)">🎁 开启 (1次)</button>
+                    <button class="sys-btn btn-treasure" onclick="game.exchangeTreasure()">♻️ 碎片兑换</button>
+                </div>
+                
+                <div style="border-top:1px solid #444; margin-top:5px; padding-top:5px;">
+                    <input type="text" id="redeem-code" placeholder="输入兑换码" style="width:50%; padding:5px; background:#111; border:1px solid #444; color:#fff;">
+                    <button onclick="game.redeemCode()" style="padding:5px; width:40%;">+10次</button>
+                </div>
+
+                <div style="font-weight:bold; margin-top:10px; border-bottom:1px solid #444;">已装备</div>
+                <div class="equip-grid" id="treasure-equip-grid" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                    <!-- Equip Slots -->
+                </div>
+
+                <div style="font-weight:bold; margin-top:10px; display:flex; justify-content:space-between;">
+                    <span>秘宝背包</span>
+                    <button onclick="game.autoDecompose()" style="font-size:0.7rem; padding:2px 5px; background:#f44336;">一键分解</button>
+                </div>
+                <div class="treasure-bag-grid" id="treasure-bag">
+                    <!-- Bag Slots -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="tooltip"></div>
+
+<!-- Item Modal -->
+<div id="item-modal">
+    <div class="modal-content">
+        <h3 id="modal-title" style="margin-top:0;">Item Name</h3>
+        <p id="modal-desc" style="color:#aaa; font-size:0.9rem;">Stats</p>
+        <div id="modal-actions">
+            <!-- Buttons injected by JS -->
+        </div>
+        <button class="modal-btn btn-close" onclick="game.closeModal()">关闭</button>
+    </div>
+</div>
+
+<script>
+/**
+ * Core Config
+ */
+const SCALE_ENEMY = 2.155; 
+const SCALE_EQUIP = 1.2;    
+const SCALE_PILL  = 1.3;
+const SCALE_TOWER_STR = 10.0;
+const SCALE_TOWER_DROP = 2.0;
+
+// Equips
+const SLOTS_CONFIG = {
+    'weapon':   { name: '武器', weight: 10 }, 'offhand':  { name: '副武', weight: 10 },
+    'helm':     { name: '头部', weight: 10 }, 'boots':    { name: '鞋履', weight: 10 },
+    'legs':     { name: '护腿', weight: 10 }, 'armor':    { name: '衣服', weight: 10 },
+    'bracers':  { name: '护腕', weight: 10 }, 'belt':     { name: '腰带', weight: 10 },
+    'necklace': { name: '项链', weight: 10 }, 'orb':      { name: '宝珠', weight: 10 },
+    'ring':     { name: '戒指', weight: 10 }, 'secret':   { name: '秘宝', weight: 10 }
+};
+const SLOT_KEYS = Object.keys(SLOTS_CONFIG);
+
+// Treasures
+const TREASURE_SLOTS = ['天', '地', '玄', '黄', '宇', '宙'];
+const TREASURE_QUALITIES = {
+    'N': { val: 0.65, color: '#b0b0b0', weight: 10 },
+    'R': { val: 0.75, color: '#4caf50', weight: 10 },
+    'SR': { val: 0.9, color: '#03a9f4', weight: 10 },
+    'SSR': { val: 1.1, color: '#ffc107', weight: 10 },
+    'UR': { val: 1.5, color: '#ff3d00', weight: 10 }
+};
+const TREASURE_ATTRS = [
+    { name: '全属性加成', type: 'all_stat', weight: 10 },
+    { name: '爬塔真意掉率', type: 'tower_drop', weight: 10 },
+    { name: '刷丹倍率', type: 'pill_mult', weight: 10 }
+];
+
+const QUALITIES = {
+    1: { name: '绿', color: 'var(--q-green)', mult: 1, weight: 25 },
+    2: { name: '蓝', color: 'var(--q-blue)', mult: 1.5, weight: 25 },
+    3: { name: '紫', color: 'var(--q-purple)', mult: 3, weight: 25 },
+    4: { name: '金', color: 'var(--q-gold)', mult: 6, weight: 15 },
+    5: { name: '红', color: 'var(--q-red)', mult: 12, weight: 10 }
+};
+
+const ENEMY_TYPES = [
+    { name: '小怪', baseAtk: 5, baseHp: 50, isBoss: false }, 
+    { name: 'BOSS', baseAtk: 30, baseHp: 1000, isBoss: true } 
+];
+
+const TOWER_TYPES = [
+    { name: '塔灵', baseAtk: 150, baseHp: 750, isBoss: false },
+    { name: '塔主', baseAtk: 1500, baseHp: 7500, isBoss: true }
+];
+
+// Utils
+function formatNum(num) {
+    if (num < 10000) return Math.floor(num);
+    if (num < 100000000) return (num / 10000).toFixed(2) + '万';
+    if (num < 1000000000000) return (num / 100000000).toFixed(2) + '亿';
+    return num.toExponential(2).replace('+', '');
+}
+
+function getWeightedRandom(items, weightKey = 'weight') {
+    let totalWeight = 0;
+    const isArray = Array.isArray(items);
+    const keys = isArray ? items : Object.keys(items);
+    
+    keys.forEach(k => {
+        totalWeight += (isArray ? k[weightKey] : items[k][weightKey]);
+    });
+
+    let randomVal = Math.random() * totalWeight;
+    for (let k of keys) {
+        let w = isArray ? k[weightKey] : items[k][weightKey];
+        if (randomVal < w) return isArray ? k : k;
+        randomVal -= w;
+    }
+    return isArray ? keys[keys.length-1] : keys[keys.length-1];
+}
+
+class Item {
+    constructor(difficulty, typeOverride = null) {
+        this.id = Math.random().toString(36).substr(2, 9);
+        if (typeOverride === 'pill') {
+            this.type = 'pill';
+            this.level = difficulty; 
+            this.name = `混元丹 (Lv.${this.level})`;
+            this.quality = 3; 
+            this.hpValue = 5 * Math.pow(SCALE_PILL, this.level);
+            this.atkValue = 1 * Math.pow(SCALE_PILL, this.level);
+            return;
+        }
+        this.type = typeOverride || getWeightedRandom(SLOTS_CONFIG, 'weight');
+        const baseLevel = difficulty * 3;
+        this.level = Math.max(0, baseLevel + Math.floor(Math.random()*5)-2);
+        this.quality = parseInt(getWeightedRandom(QUALITIES, 'weight'));
+        const qConfig = QUALITIES[this.quality];
+        this.name = ['破铁','精钢','玄铁','秘银','龙鳞','混沌'][Math.min(5, Math.floor(this.level/10))] + SLOTS_CONFIG[this.type].name;
+        
+        const baseVal = 10 * Math.pow(SCALE_EQUIP, this.level);
+        this.atk = baseVal * qConfig.mult * (Math.random() < 0.5 ? 1 : 0);
+        this.hp = baseVal * qConfig.mult * 5 * (this.atk > 0 ? 0 : 1);
+        this.crit = 0;
+    }
+}
+
+class Treasure {
+    constructor(level) {
+        this.id = Math.random().toString(36).substr(2, 9);
+        this.slot = TREASURE_SLOTS[Math.floor(Math.random() * TREASURE_SLOTS.length)];
+        this.qKey = getWeightedRandom(TREASURE_QUALITIES, 'weight');
+        this.qualityConf = TREASURE_QUALITIES[this.qKey];
+        this.level = level;
+        this.isLocked = false;
+        this.attrType = getWeightedRandom(TREASURE_ATTRS, 'weight');
+        
+        const offset = this.qualityConf.val;
+        // Formula: 10 ^ (Offset * Level / 10)
+        const exponent = (offset * this.level) / 10;
+        this.val = Math.pow(10, exponent);
+        
+        this.hasExtra = Math.random() < 0.5;
+        this.extraVal = 0;
+        if (this.hasExtra) {
+            this.extraVal = Math.pow(10, (offset * this.level) / 10);
+        }
+        this.name = `${this.qKey}·${this.slot}·${this.attrType.name}`;
+        this.score = offset * this.level * 10;
+    }
+}
+
+class Dungeon {
+    constructor(game) {
+        this.game = game;
+        this.active = false;
+        this.level = 1;
+        this.wave = 0;
+        // Config: 3 Waves. Each wave has spawn events.
+        this.waves = [
+            // Wave 1: Mobs
+            [{ type: 'mob', count: 10, delay: 0 }],
+            // Wave 2: Elites (delayed start)
+            [{ type: 'elite', count: 3, delay: 3000 }], 
+            // Wave 3: Boss
+            [{ type: 'boss', count: 1, delay: 3000 }]
+        ];
+        this.timer = null;
+        this.autoRestartTimer = null;
+        this.timeRemaining = 0;
+        this.spawnEventsScheduled = 0;
+        this.spawnEventsCompleted = 0;
+    }
+
+    start() {
+        this.active = true;
+        this.level = this.game.difficulty; 
+        this.wave = 0;
+        this.game.enemies = [];
+        this.spawnEventsScheduled = 0;
+        this.spawnEventsCompleted = 0;
+        this.nextWave();
+        this.updateUI();
+    }
+
+    stop() {
+        this.active = false;
+        clearTimeout(this.timer);
+        clearTimeout(this.autoRestartTimer);
+        this.game.enemies = [];
+        this.timeRemaining = 0;
+        this.updateUI();
+    }
+
+    nextWave() {
+        if (this.wave >= this.waves.length) {
+            this.victory();
+            return;
+        }
+        
+        // Load current wave config
+        const waveEvents = this.waves[this.wave];
+        this.spawnEventsScheduled = waveEvents.length;
+        this.spawnEventsCompleted = 0;
+
+        this.game.log('SYS', `副本波次 ${this.wave + 1}/${this.waves.length} 开始...`);
+
+        waveEvents.forEach(event => {
+            setTimeout(() => {
+                if(!this.active) return;
+                for(let i=0; i<event.count; i++) {
+                    this.spawnEnemy(event.type);
+                }
+                this.spawnEventsCompleted++;
+                this.checkWaveClear(); // Check immediately in case count was 0 or immediate clear
+            }, event.delay);
+        });
+        this.updateUI();
+    }
+
+    checkWaveClear() {
+        if (!this.active) return;
+        
+        // Condition: All spawned enemies dead AND all scheduled spawn events fired
+        if (this.game.enemies.length === 0 && this.spawnEventsCompleted >= this.spawnEventsScheduled) {
+            this.wave++;
+            this.nextWave();
+        }
+    }
+
+    spawnEnemy(type) {
+        let isBoss = (type === 'boss');
+        let baseHp = isBoss ? 10000 : (type==='elite' ? 2000 : 500);
+        let baseAtk = isBoss ? 500 : (type==='elite' ? 150 : 50);
+        
+        // Dungeon mobs scale linearly with level because damage is compressed
+        let scale = this.level * 10; 
+        
+        this.game.enemies.push({
+            id: `dungeon-${Date.now()}-${Math.random()}`,
+            name: isBoss ? `深渊领主` : (type==='elite'?'精英':'魔物'),
+            maxHp: baseHp * scale,
+            currentHp: baseHp * scale,
+            atk: baseAtk * scale,
+            isBoss: isBoss,
+            isDungeon: true,
+            emoji: isBoss ? '👿' : (type==='elite'?'👺':'💀')
+        });
+        this.game.updateCombatUI(true);
+    }
+
+    victory() {
+        this.game.log('SYS', `副本通关！30秒后开启下一轮。`);
+        this.game.log('SYS', `已通关！可前往秘宝阁开启宝箱。`);
+        this.active = false; 
+        
+        // Auto restart countdown
+        this.timeRemaining = 30;
+        this.startCountdown(() => {
+            if(this.game.mode === 'dungeon') {
+                this.game.difficulty++; 
+                this.start();
+            }
+        });
+    }
+
+    startCountdown(callback) {
+        clearInterval(this.autoRestartTimer);
+        this.autoRestartTimer = setInterval(() => {
+            if (this.timeRemaining > 0) {
+                this.timeRemaining--;
+                this.updateUI();
+            } else {
+                clearInterval(this.autoRestartTimer);
+                callback();
+            }
+        }, 1000);
+    }
+
+    updateUI() {
+        const statusEl = document.getElementById('dungeon-status');
+        const timerEl = document.getElementById('dungeon-timer');
+        if (statusEl) statusEl.innerText = this.active ? `波次 ${Math.min(this.wave+1, 3)}/3` : "待机";
+        if (timerEl) timerEl.innerText = this.timeRemaining > 0 ? `${this.timeRemaining}s` : "--";
+    }
+}
+
+class Game {
+    constructor() {
+        this.playerBase = { hp: 100, atk: 10, crit: 0 };
+        this.currentHp = 100;
+        this.difficulty = 1;
+        
+        this.equipment = {};
+        this.equippedTreasures = {}; 
+        TREASURE_SLOTS.forEach(s => this.equippedTreasures[s] = null);
+        
+        this.treasureBag = []; 
+        this.treasureDaily = 20;
+        this.treasureLimit = 20;
+        this.treasureFragments = 0;
+        
+        this.enemies = []; 
+        this.mode = 'wild';
+        
+        this.lawFragments = 0;
+        this.cultRound = 0;
+        this.cultStep = 0;
+        this.lawMultipliers = { atk: 1.0, hp: 1.0 };
+        
+        this.towerLevel = 0;
+        this.dungeon = new Dungeon(this);
+        
+        this.isDead = false;
+        this.lastTick = Date.now();
+        
+        this.initUI();
+        this.spawnWildWave();
+        this.loop();
+    }
+
+    initUI() {
+        const grid = document.getElementById('equip-grid');
+        grid.innerHTML = '';
+        SLOT_KEYS.forEach(slot => {
+            const div = document.createElement('div');
+            div.className = 'equip-slot empty';
+            div.id = `equip-${slot}`;
+            div.innerHTML = `<div>${this.getIcon(slot)}</div><div>${SLOTS_CONFIG[slot].name}</div>`;
+            grid.appendChild(div);
+        });
+
+        this.updateStatsUI();
+        this.updateSystemUI();
+        this.updateTreasureUI();
+    }
+
+    getIcon(slot) {
+        const icons = {
+            weapon:'⚔️', offhand:'🗡️', helm:'🪖', boots:'👢',
+            legs:'🦵', armor:'🥋', bracers:'🧤', belt:'🎗️',
+            necklace:'📿', orb:'🔮', ring:'💍', secret:'🏺'
+        };
+        return icons[slot] || '🛡️';
+    }
+
+    // --- Stats ---
+    getTotalStats() {
+        let stats = { ...this.playerBase };
+        let maxHp = stats.hp;
+
+        for (let key in this.equipment) {
+            const item = this.equipment[key];
+            if (item) {
+                stats.atk += item.atk || 0;
+                maxHp += item.hp || 0;
+            }
+        }
+        
+        stats.atk *= this.lawMultipliers.atk;
+        maxHp *= this.lawMultipliers.hp;
+        
+        let tMult = 1.0;
+        for (let key in this.equippedTreasures) {
+            const t = this.equippedTreasures[key];
+            if (t && t.attrType.type === 'all_stat') {
+                tMult *= t.val;
+                if(t.hasExtra) tMult *= t.extraVal;
+            }
+        }
+        stats.atk *= tMult;
+        maxHp *= tMult;
+
+        return { ...stats, maxHp };
+    }
+
+    // --- Mode ---
+    switchTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        const btnIdx = ['law','tower','dungeon','treasure'].indexOf(tab);
+        document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
+        document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+
+    toggleTowerMode() { this.changeMode('tower'); }
+    toggleDungeonMode() { this.changeMode('dungeon'); }
+    
+    changeMode(newMode) {
+        if (this.isDead) return;
+        if (this.mode === 'dungeon') this.dungeon.stop();
+        this.enemies = [];
+        
+        if (this.mode === newMode) {
+            this.mode = 'wild';
+            this.log('SYS', '返回荒野。');
+        } else {
+            this.mode = newMode;
+            if (newMode === 'tower') this.log('SYS', '进入通天塔！');
+            if (newMode === 'dungeon') {
+                this.log('SYS', '进入血色副本！伤害已被压缩。');
+                this.dungeon.start();
+            }
+        }
+        this.updateButtons();
+        if (this.mode !== 'dungeon') this.spawnWildWave();
+    }
+
+    updateButtons() {
+        const btnTower = document.getElementById('btn-tower-toggle');
+        const btnDungeon = document.getElementById('btn-dungeon-toggle');
+        const btnBoss = document.getElementById('btn-challenge');
+        const stage = document.getElementById('stage-name');
+
+        btnTower.innerText = this.mode === 'tower' ? "🏃 离开通天塔" : "🗼 挑战通天塔";
+        btnDungeon.innerText = this.mode === 'dungeon' ? "🏃 离开副本" : "🔥 进入副本";
+        btnTower.classList.toggle('active', this.mode === 'tower');
+        btnDungeon.classList.toggle('active', this.mode === 'dungeon');
+        
+        if (this.mode === 'wild') {
+            btnBoss.style.display = 'block';
+            btnBoss.innerText = "💀 召唤荒野BOSS (右键自动)";
+            stage.innerText = `荒野 - 第 ${this.difficulty} 层`;
+        } else if (this.mode === 'tower') {
+            btnBoss.style.display = 'block';
+            btnBoss.innerText = "👺 召唤塔主 (右键自动)";
+            stage.innerText = `通天塔 - 第 ${this.towerLevel} 层`;
+        } else {
+            btnBoss.style.display = 'none';
+            stage.innerText = `副本 - 难度 ${this.dungeon.level}`;
+        }
+    }
+
+    // --- Loop ---
+    loop() {
+        const now = Date.now();
+        if (now - this.lastTick >= 1000) {
+            this.combatTurn();
+            if (this.autoChallenge && !this.isDead && this.mode !== 'dungeon') {
+                if (!this.isBossAlive() && (now - this.lastBossDeathTime > 5000)) {
+                    this.summonBoss();
+                }
+            }
+            this.lastTick = now;
+        }
+        const stats = this.getTotalStats();
+        if (!this.isDead && this.currentHp < stats.maxHp && this.currentHp > 0) {
+            this.currentHp = Math.min(stats.maxHp, this.currentHp + stats.maxHp * 0.05);
+            this.updateCombatUI();
+        }
+        requestAnimationFrame(() => this.loop());
+    }
+
+    combatTurn() {
+        if (this.isDead) return;
+        this.enemies = this.enemies.filter(e => e.currentHp > 0);
+        
+        if (this.mode !== 'dungeon' && this.enemies.filter(e => !e.isBoss).length < 5) {
+            this.spawnWildWave();
+        }
+        if (this.mode === 'dungeon') this.dungeon.checkWaveClear();
+
+        if (this.currentHp <= 0) {
+            this.handleLoss();
+            return;
+        }
+
+        const pStats = this.getTotalStats();
+        
+        // Damage (Player -> Enemy)
+        let atk = pStats.atk;
+        if (this.mode === 'dungeon') atk = Math.pow(Math.log10(Math.max(10, atk)), 2);
+
+        const isSkill = Math.random() < 0.3;
+        if (isSkill) {
+            this.showSkillEffect("横扫千军!");
+            this.enemies.forEach(e => this.dealDamage(e, atk * 1.1, pStats.crit));
+        } else {
+            if (this.enemies[0]) this.dealDamage(this.enemies[0], atk, pStats.crit);
+        }
+
+        // Damage (Enemy -> Player)
+        let totalDmg = 0;
+        this.enemies.forEach(e => {
+            let eAtk = e.atk;
+            if (this.mode === 'dungeon') eAtk = Math.pow(Math.log10(Math.max(10, eAtk)), 2);
+            totalDmg += eAtk;
+        });
+
+        if (this.mode === 'dungeon') {
+            // Effective HP Formula: log(HP)^2 * 5
+            const effMax = Math.pow(Math.log10(Math.max(10, pStats.maxHp)), 2) * 5;
+            const dmgPct = totalDmg / effMax;
+            this.currentHp -= pStats.maxHp * dmgPct; // Scale real damage
+            if(totalDmg > 0) this.showDamage(totalDmg, 'player'); 
+        } else {
+            this.currentHp -= totalDmg;
+            if(totalDmg > 0) this.showDamage(totalDmg, 'player');
+        }
+
+        if (this.currentHp <= 0) this.handleLoss();
+        this.updateCombatUI();
+    }
+
+    dealDamage(enemy, amt, critRate) {
+        if (Math.random() * 100 < critRate) amt *= 2;
+        enemy.currentHp -= amt;
+        this.showDamage(amt, enemy.id, amt > this.getTotalStats().atk ? true : false);
+        if (enemy.currentHp <= 0) this.handleKill(enemy);
+    }
+
+    handleKill(enemy) {
+        if (this.mode === 'tower') {
+            if (enemy.isBoss) {
+                this.towerLevel++;
+                this.log('GAIN', '击败塔主！层数+1');
+                this.rollTowerLoot(true);
+                this.updateButtons();
+            } else {
+                this.rollTowerLoot(false);
+            }
+        } else if (this.mode === 'wild') {
+            if (enemy.isBoss) {
+                this.difficulty++;
+                this.lastBossDeathTime = Date.now();
+                this.log('GAIN', '击败BOSS！难度+1');
+                this.rollWildLoot(true);
+                this.updateButtons();
+            } else {
+                this.rollWildLoot(false);
+            }
+        }
+    }
+
+    handleLoss() {
+        if (this.isDead) return;
+        this.isDead = true;
+        this.currentHp = 0;
+        let reviveTime = (this.mode === 'dungeon') ? 15000 : 2000;
+        
+        // Start countdown for revive
+        let remaining = reviveTime / 1000;
+        const reviveOverlay = document.getElementById('resurrect-overlay');
+        const reviveText = document.getElementById('resurrect-text');
+        reviveOverlay.style.display = 'flex';
+        document.getElementById('player-entity').classList.add('player-dead');
+        
+        const timer = setInterval(() => {
+            remaining--;
+            if (remaining <= 0) clearInterval(timer);
+            reviveText.innerHTML = `已死亡<br><span style="font-size:1rem; color:#fff;">${remaining}秒后复活...</span>`;
+        }, 1000);
+        reviveText.innerHTML = `已死亡<br><span style="font-size:1rem; color:#fff;">${remaining}秒后复活...</span>`;
+
+        if(this.mode === 'dungeon') {
+            this.dungeon.stop();
+            // Start restart countdown for dungeon specifically handled in victory/defeat
+            this.dungeon.timeRemaining = 15;
+            this.dungeon.startCountdown(() => {
+                // Do nothing, revive handles restart
+            });
+        }
+        
+        if(this.mode === 'wild' && this.enemies.some(e=>e.isBoss)) {
+            this.enemies = this.enemies.filter(e=>!e.isBoss);
+            this.lastBossDeathTime = Date.now();
+        }
+        
+        setTimeout(() => this.revive(), reviveTime);
+    }
+
+    revive() {
+        this.isDead = false;
+        this.currentHp = this.getTotalStats().maxHp;
+        document.getElementById('resurrect-overlay').style.display = 'none';
+        document.getElementById('player-entity').classList.remove('player-dead');
+        
+        if (this.mode === 'dungeon') {
+            this.dungeon.start(); 
+        } else {
+            this.spawnWildWave();
+        }
+    }
+
+    // --- Treasure System ---
+    openTreasureBox(count) {
+        if (this.treasureDaily < count) {
+            this.log('SYS', '今日秘宝次数已尽！');
+            return;
+        }
+        this.treasureDaily -= count;
+        
+        const num = Math.floor(Math.random() * 2) + 3; // 3-4
+        for(let i=0; i<num; i++) {
+            const t = new Treasure(this.difficulty + 1);
+            this.treasureBag.push(t);
+            this.log('GAIN', `获得秘宝: <span class="t-${t.qKey}">${t.name}</span>`);
+        }
+        this.updateSystemUI();
+        this.updateTreasureUI();
+    }
+
+    exchangeTreasure() {
+        if (this.treasureFragments >= 100) {
+            this.treasureFragments -= 100;
+            const t = new Treasure(this.difficulty + 1);
+            this.treasureBag.push(t);
+            this.log('GAIN', `兑换成功: ${t.name}`);
+            this.updateSystemUI();
+            this.updateTreasureUI();
+        } else {
+            this.log('SYS', '碎片不足100');
+        }
+    }
+
+    autoDecompose() {
+        let count = 0;
+        this.treasureBag = this.treasureBag.filter(t => {
+            if (!t.isLocked) {
+                count++;
+                this.treasureFragments += 10;
+                return false;
+            }
+            return true;
+        });
+        if (count > 0) this.log('SYS', `分解了 ${count} 个秘宝，获得 ${count*10} 碎片`);
+        this.updateSystemUI();
+        this.updateTreasureUI();
+    }
+
+    redeemCode() {
+        const input = document.getElementById('redeem-code');
+        if (input.value === 'VIP666') {
+            const max = this.treasureLimit; 
+            // "Cannot overflow limit" -> assumes max is fixed cap
+            // But prompt says "Paid items increase limit".
+            // "Daily code +10 but cannot overflow".
+            // Let's assume hard cap 20 for free users.
+            const added = Math.min(this.treasureLimit - this.treasureDaily, 10);
+            if (added > 0) {
+                this.treasureDaily += added;
+                this.log('SYS', `兑换成功！次数+${added}`);
+            } else {
+                this.log('SYS', '次数已满！');
+            }
+            input.value = '';
+            this.updateSystemUI();
+        } else {
+            this.log('SYS', '无效兑换码');
+        }
+    }
+
+    // Manual Equip/Lock Logic
+    showItemModal(index, isEquipped) {
+        const t = isEquipped ? this.equippedTreasures[index] : this.treasureBag[index];
+        if (!t) return;
+
+        const modal = document.getElementById('item-modal');
+        document.getElementById('modal-title').innerText = t.name;
+        document.getElementById('modal-title').className = `t-${t.qKey}`;
+        
+        let desc = `等级: ${t.level}<br>${t.attrType.name}: ${formatNum(t.val)}倍`;
+        if (t.hasExtra) desc += `<br>(VIP)额外加成: ${formatNum(t.extraVal)}倍`;
+        desc += `<br>评分: ${formatNum(t.score)}`;
+        document.getElementById('modal-desc').innerHTML = desc;
+
+        const acts = document.getElementById('modal-actions');
+        acts.innerHTML = '';
+
+        if (isEquipped) {
+            acts.innerHTML += `<button class="modal-btn btn-close" onclick="game.unequipTreasure('${index}')">卸下</button>`;
+        } else {
+            acts.innerHTML += `<button class="modal-btn btn-use" onclick="game.equipTreasure(${index})">装备</button>`;
+            acts.innerHTML += `<button class="modal-btn btn-lock" onclick="game.toggleLock(${index})">${t.isLocked?'解锁':'锁定'}</button>`;
+            acts.innerHTML += `<button class="modal-btn btn-split" onclick="game.decomposeSingle(${index})">分解</button>`;
+        }
+        
+        modal.style.display = 'flex';
+    }
+
+    closeModal() { document.getElementById('item-modal').style.display = 'none'; }
+
+    equipTreasure(index) {
+        const t = this.treasureBag[index];
+        const old = this.equippedTreasures[t.slot];
+        
+        this.equippedTreasures[t.slot] = t;
+        this.treasureBag.splice(index, 1); 
+        
+        if (old) this.treasureBag.push(old); 
+        
+        this.closeModal();
+        this.updateTreasureUI();
+        this.updateSystemUI(); 
+        this.updateStatsUI();
+    }
+
+    unequipTreasure(slot) {
+        const t = this.equippedTreasures[slot];
+        if (t) {
+            this.equippedTreasures[slot] = null;
+            this.treasureBag.push(t);
+        }
+        this.closeModal();
+        this.updateTreasureUI();
+        this.updateStatsUI();
+    }
+
+    toggleLock(index) {
+        this.treasureBag[index].isLocked = !this.treasureBag[index].isLocked;
+        this.showItemModal(index, false);
+        this.updateTreasureUI();
+    }
+
+    decomposeSingle(index) {
+        this.treasureBag.splice(index, 1);
+        this.treasureFragments += 10;
+        this.closeModal();
+        this.updateSystemUI();
+        this.updateTreasureUI();
+    }
+
+    updateTreasureUI() {
+        // Equip Grid
+        TREASURE_SLOTS.forEach(slot => {
+            const el = document.getElementById(`treasure-equip-${slot}`);
+            let container = document.getElementById('treasure-equip-grid');
+            if (!el) {
+                const div = document.createElement('div');
+                div.className = 'equip-slot empty';
+                div.id = `treasure-equip-${slot}`;
+                div.onclick = () => this.showItemModal(slot, true);
+                div.innerHTML = `<div>🔮</div><div>${slot}</div>`;
+                container.appendChild(div);
+            }
+            
+            const div = document.getElementById(`treasure-equip-${slot}`);
+            const t = this.equippedTreasures[slot];
+            if (t) {
+                div.className = `equip-slot t-${t.qKey}`;
+                div.innerHTML = `<div>🔮</div><div>${t.name.split('·')[2]}</div>`;
+            } else {
+                div.className = 'equip-slot empty';
+                div.innerHTML = `<div>🔮</div><div>${slot}</div>`;
+            }
+        });
+
+        // Bag Grid
+        const bagContainer = document.getElementById('treasure-bag');
+        bagContainer.innerHTML = '';
+        this.treasureBag.forEach((t, i) => {
+            const div = document.createElement('div');
+            div.className = `equip-slot t-${t.qKey}`;
+            div.style.position = 'relative';
+            div.innerHTML = `
+                <div>${t.slot}</div>
+                <div style="font-size:0.6rem">${formatNum(t.val)}x</div>
+                ${t.isLocked ? '<div class="locked-icon">🔒</div>' : ''}
+            `;
+            div.onclick = () => this.showItemModal(i, false);
+            bagContainer.appendChild(div);
+        });
+        
+        let bonus = "";
+        let drops = 0, pills = 0;
+        for(let k in this.equippedTreasures) {
+            const t = this.equippedTreasures[k];
+            if(t) {
+                if(t.attrType.type === 'tower_drop') drops += t.val;
+                if(t.attrType.type === 'pill_mult') pills += t.val;
+            }
+        }
+        if (drops > 0) bonus += `塔掉落x${formatNum(drops)} `;
+        if (pills > 0) bonus += `丹倍率x${formatNum(pills)}`;
+        document.getElementById('bonus-treasure').innerText = bonus || "无";
+    }
+
+    // --- Other Logic ---
+    spawnWildWave() {
+        if(this.mode === 'dungeon') return;
+        const scale = this.mode==='tower' ? Math.pow(SCALE_TOWER_STR, this.towerLevel) : Math.pow(SCALE_ENEMY, this.difficulty);
+        const type = this.mode==='tower' ? TOWER_TYPES[0] : ENEMY_TYPES[0];
+        while(this.enemies.filter(e=>!e.isBoss).length < 5) {
+            this.enemies.push({
+                id: `mob-${Date.now()}-${Math.random()}`,
+                name: type.name,
+                maxHp: type.baseHp * scale,
+                currentHp: type.baseHp * scale,
+                atk: type.baseAtk * scale,
+                isBoss: false,
+                emoji: '👾'
+            });
+        }
+        this.updateCombatUI(true);
+    }
+
+    isBossAlive() {
+        return this.enemies.some(e => e.isBoss);
+    }
+
+    manualSummonBoss() {
+        if (this.isBossAlive()) return;
+        this.summonBoss();
+    }
+
+    summonBoss() {
+        if (this.isBossAlive()) return;
+        const scale = this.mode==='tower' ? Math.pow(SCALE_TOWER_STR, this.towerLevel) : Math.pow(SCALE_ENEMY, this.difficulty);
+        const type = this.mode==='tower' ? TOWER_TYPES[1] : ENEMY_TYPES[1];
+        this.enemies.push({
+            id: `boss-${Date.now()}`,
+            name: type.name,
+            maxHp: type.baseHp * scale,
+            currentHp: type.baseHp * scale,
+            atk: type.baseAtk * scale,
+            isBoss: true,
+            emoji: '👹'
+        });
+        this.log('SYS', '首领降临！');
+        this.updateCombatUI(true);
+    }
+
+    toggleAutoBoss() {
+        this.autoChallenge = !this.autoChallenge;
+        this.updateButtons();
+    }
+
+    rollWildLoot(isBoss) {
+        let pillMult = 1;
+        for(let k in this.equippedTreasures) {
+            const t = this.equippedTreasures[k];
+            if(t && t.attrType.type === 'pill_mult') pillMult *= t.val; 
+        }
+        const pill = new Item(this.difficulty, 'pill');
+        pill.hpValue *= pillMult; pill.atkValue *= pillMult;
+        this.autoConsumePill(pill);
+
+        if (Math.random() < (isBoss ? 1 : 0.5)) {
+            this.checkAutoEquip(new Item(this.difficulty));
+        }
+    }
+
+    rollTowerLoot(isBoss) {
+        let drop = Math.pow(SCALE_TOWER_DROP, this.towerLevel) * (1 + this.cultRound);
+        if(isBoss) drop *= 10;
+        
+        let tMult = 1;
+        for(let k in this.equippedTreasures) {
+            const t = this.equippedTreasures[k];
+            if(t && t.attrType.type === 'tower_drop') tMult *= t.val;
+        }
+        drop *= tMult;
+        
+        this.lawFragments += drop;
+        this.log('GAIN', `获得真意: ${formatNum(drop)}`);
+        this.updateSystemUI();
+    }
+
+    autoConsumePill(pill) {
+        this.playerBase.hp += pill.hpValue;
+        this.playerBase.atk += pill.atkValue;
+        this.updateStatsUI();
+    }
+
+    checkAutoEquip(newItem) {
+        const curr = this.equipment[newItem.type];
+        const score = (i) => (i.hp||0) + (i.atk||0)*5;
+        if (!curr || score(newItem) > score(curr)) {
+            this.equipment[newItem.type] = newItem;
+            this.log('GAIN', `换装: ${newItem.name}`);
+            this.updateEquipUI();
+        } else {
+            this.playerBase.hp += 1;
+        }
+        this.updateStatsUI();
+    }
+
+    updateEquipUI() {
+        SLOT_KEYS.forEach(slot => {
+            const el = document.getElementById(`equip-${slot}`);
+            const item = this.equipment[slot];
+            if (item) {
+                el.className = `equip-slot q-${item.quality}`;
+                el.innerHTML = `<div>${this.getIcon(slot)}</div><div>${item.name}</div>`;
+                el.onclick = () => this.log('SYS', `${item.name}: 攻${formatNum(item.atk)} 血${formatNum(item.hp)}`);
+            }
+        });
+    }
+
+    cultivate() {
+        const cost = 2 * Math.pow(2, this.cultRound);
+        if (this.lawFragments >= cost) {
+            this.lawFragments -= cost;
+            if (this.cultStep % 2 === 0) this.lawMultipliers.atk *= 1.1;
+            else this.lawMultipliers.hp *= 1.1;
+            this.cultStep++;
+            if (this.cultStep >= 10) { this.cultStep = 0; this.cultRound++; }
+            this.updateSystemUI();
+            this.updateStatsUI();
+            return true;
+        }
+        return false;
+    }
+
+    cultivateAll() {
+        let count = 0;
+        while(this.cultivate()) { count++; }
+        if(count) this.log('SYS', `一键修炼 ${count} 次`);
+        else this.log('SYS', '真意不足');
+    }
+
+    updateSystemUI() {
+        document.getElementById('res-law').innerText = formatNum(this.lawFragments);
+        document.getElementById('cult-round').innerText = this.cultRound;
+        document.getElementById('cult-step').innerText = `${this.cultStep}/10`;
+        document.getElementById('cult-cost').innerText = formatNum(2 * Math.pow(2, this.cultRound));
+        document.getElementById('cult-next').innerText = (this.cultStep%2===0 ? "攻击" : "生命") + " x1.1";
+        
+        document.getElementById('tower-lv').innerText = this.towerLevel;
+        document.getElementById('tower-drop').innerText = formatNum(Math.pow(SCALE_TOWER_DROP, this.towerLevel));
+        
+        document.getElementById('dungeon-lv').innerText = this.difficulty;
+        document.getElementById('dungeon-status').innerText = this.dungeon.active ? `波次 ${Math.min(this.dungeon.wave+1, 3)}/3` : "待机";
+        if(document.getElementById('dungeon-timer')) document.getElementById('dungeon-timer').innerText = this.dungeon.timeRemaining > 0 ? `${this.dungeon.timeRemaining}s` : "--";
+        
+        document.getElementById('treasure-daily').innerText = `${this.treasureDaily}/${this.treasureLimit}`;
+        document.getElementById('treasure-frags').innerText = this.treasureFragments;
+    }
+
+    updateStatsUI() {
+        const s = this.getTotalStats();
+        document.getElementById('stat-hp').innerText = `${formatNum(Math.max(0, this.currentHp))} / ${formatNum(s.maxHp)}`;
+        document.getElementById('stat-atk').innerText = formatNum(s.atk);
+        if(document.getElementById('stat-crit')) document.getElementById('stat-crit').innerText = s.crit + '%';
+        
+        const atkMul = (this.lawMultipliers.atk * 100).toFixed(0) + '%';
+        const hpMul = (this.lawMultipliers.hp * 100).toFixed(0) + '%';
+        document.getElementById('mul-atk').innerText = `${atkMul} / ${hpMul}`;
+        
+        document.getElementById('mul-drop').innerText = "+" + (this.cultRound * 100) + '%';
+    }
+
+    updateCombatUI(force) {
+        const s = this.getTotalStats();
+        const pct = Math.min(100, Math.max(0, (this.currentHp / s.maxHp) * 100));
+        document.getElementById('player-hp-bar').style.width = pct + '%';
+        
+        const c = document.getElementById('enemy-container');
+        if (force || c.children.length !== this.enemies.length) {
+            c.innerHTML = '';
+            this.enemies.forEach(e => {
+                const el = document.createElement('div');
+                el.className = `entity ${e.isBoss?'boss-entity':'enemy-entity'}`;
+                el.id = `e-${e.id}`;
+                el.innerHTML = `<div class="enemy-stats">${formatNum(e.atk)}<br>${formatNum(Math.max(0, e.currentHp))}</div>${e.emoji}<div class="hp-bar-container"><div class="hp-bar-fill enemy-hp" style="width:${Math.max(0, e.currentHp)/e.maxHp*100}%"></div></div>`;
+                c.appendChild(el);
+            });
+        } else {
+            this.enemies.forEach(e => {
+                const el = document.getElementById(`e-${e.id}`);
+                if(el) {
+                    el.querySelector('.enemy-stats').innerHTML = `${formatNum(e.atk)}<br>${formatNum(Math.max(0, e.currentHp))}`;
+                    el.querySelector('.hp-bar-fill').style.width = (Math.max(0, e.currentHp)/e.maxHp*100)+'%';
+                }
+            });
+        }
+    }
+
+    showDamage(val, target, crit) {
+        const overlay = document.getElementById('damage-overlay');
+        const el = document.createElement('div');
+        el.className = 'damage-text';
+        el.innerHTML = (crit ? '💥 ' : '') + formatNum(val);
+        
+        if (target === 'player') {
+            el.style.color = '#f44336';
+            el.style.left = '50%';
+            el.style.top = '70%';
+        } else {
+            const tEl = document.getElementById(`e-${target}`);
+            if (tEl) {
+                // Simple approx positioning for grid
+                const rect = tEl.getBoundingClientRect();
+                // Since we can't easily map rect to overlay percentage without more math, 
+                // just randomize slightly to simulate "on the field"
+                el.style.color = '#fff';
+                el.style.left = (10 + Math.random()*80) + '%';
+                el.style.top = (20 + Math.random()*40) + '%';
+            }
+        }
+        overlay.appendChild(el);
+        setTimeout(()=>el.remove(), 800);
+    }
+    
+    showSkillEffect(txt) {
+        const el = document.createElement('div');
+        el.className = 'skill-text';
+        el.innerText = txt;
+        document.getElementById('skill-overlay').appendChild(el);
+        setTimeout(()=>el.remove(), 1000);
+    }
+    
+    log(type, msg) {
+        const d = document.createElement('div');
+        d.className = 'log-entry';
+        d.innerHTML = `<span class="log-${type.toLowerCase()}">[${type}]</span> ${msg}`;
+        const log = document.getElementById('battle-log');
+        log.appendChild(d);
+        log.scrollTop = log.scrollHeight;
+    }
+}
+
+const game = new Game();
+</script>
+</body>
+</html>
