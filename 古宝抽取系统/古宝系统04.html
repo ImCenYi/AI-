@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大千宝录古宝系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #020617;
+            color: #f1f5f9;
+            overflow: hidden;
+        }
+
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 2px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.2);
+            border-radius: 10px;
+        }
+
+        .float-animation {
+            animation: float 5s ease-in-out infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+            100% { transform: translateY(0px); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 霓虹文字效果 - 增强版 */
+        .neon-text {
+            text-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 20px rgba(59, 130, 246, 0.4), 0 0 30px rgba(234, 179, 8, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen flex items-center justify-center p-2 select-none">
+        <!-- 主界面容器 -->
+        <div class="relative w-full max-w-6xl aspect-[16/9] bg-[#0f172a] border border-slate-700/30 rounded-2xl shadow-2xl flex overflow-hidden">
+            
+            <!-- 1. 左侧页签栏 -->
+            <div class="w-16 bg-[#020617]/70 border-r border-slate-800/50 flex flex-col items-center py-4 gap-4 z-20">
+                <div class="w-10 h-10 rounded-full bg-blue-600/10 flex items-center justify-center text-blue-500 border border-blue-500/20">
+                    <i data-lucide="layout-grid" size="18"></i>
+                </div>
+                <div class="flex-1 flex flex-col gap-3">
+                    <button 
+                        v-for="(items, tabName) in library" 
+                        :key="tabName"
+                        @click="activeTab = tabName; selectedId = null"
+                        :class="['w-10 h-14 rounded-lg flex items-center justify-center transition-all border', activeTab === tabName ? 'bg-blue-600 text-white border-blue-400 shadow-lg' : 'text-slate-500 border-transparent hover:text-slate-300']"
+                    >
+                        <span class="text-[9px] font-black" style="writing-mode: vertical-rl;">{{ tabName.slice(0, 2) }}</span>
+                    </button>
+                </div>
+
+                <!-- 全局一键升级按钮 -->
+                <button 
+                    @click="handleGlobalQuickUpgrade"
+                    class="w-10 h-10 rounded-lg bg-orange-600/20 border border-orange-500/40 text-orange-400 flex flex-col items-center justify-center hover:bg-orange-600/40 transition-all group"
+                    title="一键升级所有古宝"
+                >
+                    <i data-lucide="zap" size="14" class="group-hover:scale-110 transition-transform"></i>
+                    <span class="text-[7px] font-bold mt-0.5">ALL</span>
+                </button>
+            </div>
+
+            <!-- 2. 中间图鉴列表 -->
+            <div class="flex-1 bg-slate-900/10 p-4 overflow-y-auto custom-scrollbar relative z-10">
+                <!-- 顶部数值展示区 -->
+                <div class="mb-4 flex justify-between items-end px-1 border-b border-slate-800/50 pb-2">
+                    <div>
+                        <h2 class="text-base font-black tracking-[0.3em] bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400 uppercase">
+                            万 代 古 宝 库
+                        </h2>
+                        <div class="flex items-baseline gap-2 mt-1">
+                            <span class="text-[8px] text-slate-500 font-bold uppercase tracking-widest">Total Multiplier:</span>
+                            <!-- 总战力显示 (Log10科学计数法) -->
+                            <span class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-orange-400 to-red-500 neon-text font-mono tracking-tight">
+                                ×{{ formatLog10(totalLog10Power) }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-[7px] text-slate-600 font-bold uppercase tracking-widest">
+                            已收集: <span class="text-blue-400">{{ collectedCount }}</span> / {{ totalCount }}
+                        </div>
+                        <div class="text-[7px] text-slate-600 font-bold uppercase tracking-widest mt-0.5">
+                           当前界域: ×{{ formatLog10(tabLog10Power(activeTab)) }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 分品质渲染 -->
+                <div v-for="rank in ['UR', 'SSR', 'SR', 'R']" :key="rank" class="mb-5">
+                    <div v-if="filteredLibrary(rank).length" class="flex items-center gap-2 mb-2">
+                        <span :class="['text-[7px] font-black px-1 py-0.5 rounded text-white shadow-sm', rankColors[rank]]">{{ rank }}</span>
+                        <span class="text-[7px] text-slate-600 font-mono scale-90 origin-left">
+                            (成长率: {{ ((rankGrowth[rank] - 1) * 100).toFixed(0) }}%)
+                        </span>
+                        <div class="h-[1px] flex-1 bg-slate-800/30"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-10 gap-x-2 gap-y-3">
+                        <div 
+                            v-for="item in filteredLibrary(rank)" 
+                            :key="item.id"
+                            @click="selectedId = item.id"
+                            :class="['relative group cursor-pointer transition-all duration-300', selectedId === item.id ? 'scale-105 z-10' : 'hover:scale-105']"
+                        >
+                            <div :class="['relative aspect-square rounded-lg border transition-all p-1 overflow-hidden', 
+                                selectedId === item.id ? 'border-blue-500 bg-blue-500/10 shadow-[0_0_10px_rgba(59,130,246,0.3)]' : 'border-slate-800/40 bg-slate-900/20 hover:border-slate-600',
+                                !isUnlocked(item.id) ? 'grayscale opacity-25 hover:opacity-100 hover:grayscale-0' : '']">
+                                
+                                <div v-if="hasShards(item.id)" class="absolute top-0.5 right-0.5 w-1 h-1 bg-red-500 rounded-full z-20"></div>
+
+                                <!-- 左上角：重数 -->
+                                <div v-if="isUnlocked(item.id)" class="absolute top-0 left-0 px-1 py-0.5 bg-black/60 rounded-br-lg backdrop-blur-sm z-10 border-r border-b border-white/5">
+                                    <span class="text-[9px] font-black text-blue-400 leading-none tracking-tighter shadow-black drop-shadow-md">
+                                        {{ playerData[item.id].tier }}重
+                                    </span>
+                                </div>
+
+                                <!-- 右下角：等级 -->
+                                <div v-if="isUnlocked(item.id)" class="absolute bottom-0 right-0 px-1 py-0.5 z-10 bg-black/40 rounded-tl-lg backdrop-blur-[1px]">
+                                    <span class="text-[8px] font-black text-white/90 font-mono italic">
+                                        Lv.{{ getTotalLevel(item.id) }}
+                                    </span>
+                                </div>
+
+                                <div class="w-full h-full flex items-center justify-center text-xl transition-transform group-hover:rotate-12">
+                                    {{ item.icon }}
+                                </div>
+
+                                <div v-if="!isUnlocked(item.id) && hasShards(item.id)" class="absolute inset-0 flex items-center justify-center bg-blue-500/10">
+                                    <div class="w-1.5 h-1.5 bg-blue-400 rounded-full animate-ping"></div>
+                                </div>
+                            </div>
+                            <p :class="['text-center mt-1 text-[9px] font-black tracking-tighter truncate transition-colors leading-tight', selectedId === item.id ? 'text-blue-400 opacity-100' : 'text-slate-400 opacity-80 group-hover:text-slate-200']">
+                                {{ item.name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 右侧详情/抽奖面板 -->
+            <div class="w-64 bg-[#020617] border-l border-slate-800/50 flex flex-col z-20 shadow-[-10px_0_30px_rgba(0,0,0,0.5)]">
+                <div v-if="!selectedId" class="flex-1 flex flex-col">
+                    <div class="p-4 flex-1 flex flex-col">
+                        <div class="flex-1 rounded-xl bg-gradient-to-b from-blue-900/10 to-transparent border border-blue-500/5 p-4 flex flex-col items-center justify-center text-center">
+                            <div class="relative w-16 h-16 mb-4 float-animation">
+                                <i data-lucide="sparkle" class="w-16 h-16 text-blue-600 opacity-10"></i>
+                                <i data-lucide="box" class="absolute inset-0 m-auto w-6 h-6 text-blue-400 animate-pulse"></i>
+                            </div>
+                            <h3 class="text-sm font-black italic tracking-[0.4em] text-white mb-1 uppercase">天 命 寻 宝</h3>
+                            <p class="text-[7px] text-slate-500 leading-tight px-4 uppercase tracking-tighter mb-4">
+                                概率：UR 2% | SSR 8% | SR 30%
+                            </p>
+                            
+                            <div class="px-2 py-0.5 bg-blue-500/5 border border-blue-500/10 rounded-full text-[7px] text-blue-400/80 font-bold uppercase tracking-widest">
+                                UR Pity: {{ pityCount }}/40
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 grid grid-cols-2 gap-2 bg-slate-900/10">
+                        <button @click="handleDraw(1)" class="py-2.5 rounded-lg bg-slate-800/40 border border-slate-700 text-[8px] font-bold hover:bg-slate-700 transition-all uppercase">
+                            一次
+                        </button>
+                        <button @click="handleDraw(10)" class="py-2.5 rounded-lg bg-blue-600 border border-blue-400 text-[8px] font-bold hover:bg-blue-500 transition-all shadow-lg uppercase">
+                            十次
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 详情页 -->
+                <div v-else class="flex-1 flex flex-col animate-in slide-in-from-right duration-200 bg-[#020617]">
+                    <div class="p-2.5 flex justify-between items-center border-b border-slate-800/50">
+                        <button @click="selectedId = null" class="p-1 text-slate-500 hover:text-white transition-colors">
+                            <i data-lucide="x" size="14"></i>
+                        </button>
+                        <span class="text-[8px] font-black text-slate-600 tracking-[0.3em] uppercase">Detail View</span>
+                        <div class="w-6"></div>
+                    </div>
+
+                    <div class="flex-1 p-4 overflow-y-auto custom-scrollbar">
+                        <div class="flex flex-col items-center mb-4">
+                            <div :class="['w-16 h-16 rounded-xl bg-gradient-to-br p-[1px] shadow-2xl mb-2', rankColors[selectedItem.rank]]">
+                                <div class="w-full h-full bg-[#020617] rounded-xl flex items-center justify-center text-3xl relative overflow-hidden">
+                                    {{ selectedItem.icon }}
+                                    <div class="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-50 animate-pulse"></div>
+                                </div>
+                            </div>
+                            <h3 class="text-sm font-black text-white mb-0.5">{{ selectedItem.name }}</h3>
+                            <div class="flex items-center gap-1">
+                                <span class="text-[8px] text-slate-500 font-mono">成长: {{ ((rankGrowth[selectedItem.rank] - 1) * 100).toFixed(0) }}%/Lv</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div class="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/50">
+                                <div class="flex justify-between items-center mb-0.5">
+                                    <h4 class="text-[7px] font-black text-blue-500 uppercase tracking-widest">单体倍率</h4>
+                                    <span class="text-[7px] text-slate-600 font-mono">{{ selectedItem.attr }}</span>
+                                </div>
+                                <!-- 单体倍率展示 -->
+                                <div class="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300 font-mono tracking-tight">
+                                    ×{{ formatNumber(calculateSinglePower(selectedId)) }}
+                                </div>
+                                <div class="text-[7px] text-slate-500 mt-1 flex justify-between">
+                                    <span>下级预览:</span>
+                                    <span class="text-green-400">×{{ formatNumber(calculateSinglePower(selectedId, 1)) }}</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/40 p-2.5 rounded-lg border border-slate-800/50">
+                                <h4 class="text-[7px] font-black text-blue-500 uppercase mb-0.5 tracking-widest">古宝传记</h4>
+                                <p class="text-[8px] text-slate-500 leading-relaxed italic">
+                                    {{ selectedItem.desc }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 border-t border-slate-800/50 bg-slate-900/20">
+                        <div class="mb-3">
+                            <div class="flex justify-between text-[7px] font-bold mb-1 px-0.5">
+                                <span class="text-slate-500 uppercase tracking-widest">注入进度</span>
+                                <span class="text-blue-400 font-mono">{{ selectedStats.level }}/10</span>
+                            </div>
+                            <div class="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                    class="h-full bg-gradient-to-r from-blue-600 to-cyan-400 transition-all duration-500"
+                                    :style="{ width: (selectedStats.level / 10 * 100) + '%' }"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <button 
+                            @click="handleUpgrade(selectedId)"
+                            :disabled="selectedStats.shards <= 0"
+                            :class="['w-full py-2.5 rounded-lg flex items-center justify-center gap-2 transition-all border shadow-sm', 
+                                selectedStats.shards > 0 
+                                ? 'bg-orange-600/90 border-orange-400 text-white hover:bg-orange-500 active:scale-95' 
+                                : 'bg-slate-800 border-slate-700 text-slate-500 cursor-not-allowed opacity-50']"
+                        >
+                            <span class="text-[9px] font-black uppercase tracking-[0.1em]">{{ selectedStats.level === 0 ? '激活' : '注入' }}</span>
+                            <span class="text-[7px] opacity-70">碎片 x1 (余:{{ selectedStats.shards }})</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 抽奖结果 (全屏点击退出) -->
+            <div 
+                v-if="showResult" 
+                @click="showResult = false"
+                class="absolute inset-0 z-50 bg-[#020617]/90 backdrop-blur-xl flex flex-col items-center justify-center fade-in cursor-pointer"
+            >
+                <div class="flex flex-col items-center pointer-events-none w-full">
+                    <h2 class="text-2xl font-black italic tracking-[1em] text-white/40 mb-10 uppercase drop-shadow-[0_5px_5px_rgba(0,0,0,0.5)]">寻 得 宝 物</h2>
+                    <div class="grid grid-cols-5 gap-4 max-w-4xl px-4 justify-items-center">
+                        <div v-for="(item, idx) in drawResults" :key="idx" class="flex flex-col items-center group">
+                            <div :class="['w-20 h-20 rounded-xl bg-gradient-to-br p-[2px] relative shadow-2xl transform transition-transform duration-300 group-hover:scale-110', rankColors[item.rank]]">
+                                <div class="w-full h-full bg-[#020617] rounded-xl flex items-center justify-center text-4xl">
+                                    {{ item.icon }}
+                                    <div class="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-orange-400 shadow-lg">x1</div>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-[10px] font-black text-slate-400 tracking-wider group-hover:text-blue-400 transition-colors">{{ item.name }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-16 text-[10px] font-bold text-slate-500 tracking-[0.5em] uppercase border-b border-slate-800 pb-1 animate-pulse">
+                        点击任意位置关闭
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全局通知 -->
+            <div v-if="toastMsg" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[100] px-4 py-1.5 bg-blue-600/90 text-white text-[9px] font-bold rounded-full shadow-2xl backdrop-blur-md animate-bounce">
+                {{ toastMsg }}
+            </div>
+
+            <!-- 动画遮罩 -->
+            <div v-if="isDrawing" class="absolute inset-0 z-[60] bg-[#020617] flex items-center justify-center">
+                <div class="flex flex-col items-center gap-2">
+                    <div class="w-8 h-8 border-2 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                    <span class="text-[7px] font-black text-blue-500 tracking-[0.3em] uppercase">探查中...</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const library = {
+                    '凡界古宝': [
+                        { id: 1, name: '青竹蜂云剑', rank: 'UR', icon: '🗡️', desc: '金雷竹炼成，辟邪神雷。', attr: '攻击' },
+                        { id: 2, name: '虚天鼎', rank: 'UR', icon: '🍯', desc: '乱星海第一秘宝。', attr: '防御' },
+                        { id: 3, name: '镇海钟', rank: 'UR', icon: '🔔', desc: '钟声响起，万法皆空。', attr: '控制' },
+                        { id: 4, name: '如意圈', rank: 'SSR', icon: '⭕', desc: '困敌之宝，随心而动。', attr: '敏捷' },
+                        { id: 5, name: '风雷翅', rank: 'SSR', icon: '🦋', desc: '遁速惊人，融合风雷。', attr: '敏捷' },
+                        { id: 6, name: '混元钵', rank: 'SSR', icon: '🥣', desc: '吸纳灵气，回复真元。', attr: '回复' },
+                        { id: 7, name: '五行环', rank: 'SR', icon: '💍', desc: '五行相生，攻守兼备。', attr: '均衡' },
+                        { id: 8, name: '白鳞盾', rank: 'SR', icon: '🛡️', desc: '深海蛟鳞，坚不可摧。', attr: '免伤' },
+                        { id: 9, name: '流星坠', rank: 'SR', icon: '💎', desc: '提升感知，星辰之力。', attr: '暴击' },
+                        { id: 10, name: '引魂灯', rank: 'R', icon: '🏮', desc: '指引神魂，加速修炼。', attr: '真元' },
+                        { id: 11, name: '百草锄', rank: 'R', icon: '⛏️', desc: '药师之利，采集必备。', attr: '采集' },
+                        { id: 12, name: '清心铃', rank: 'R', icon: '🔔', desc: '平复心魔，固守本源。', attr: '抗性' },
+                        { id: 13, name: '开山斧', rank: 'R', icon: '🪓', desc: '力大无穷。', attr: '重击' },
+                        { id: 14, name: '避水珠', rank: 'R', icon: '💧', desc: '入水如常。', attr: '移速' },
+                        { id: 15, name: '定魂珠', rank: 'R', icon: '⚪', desc: '定住神魂。', attr: '抗性' },
+                        { id: 16, name: '捆仙绳', rank: 'SR', icon: '🪢', desc: '束缚行动。', attr: '控制' },
+                        { id: 17, name: '乾坤扇', rank: 'SSR', icon: '🪭', desc: '扇动乾坤，飓风突袭。', attr: '范围' },
+                        { id: 18, name: '化功碟', rank: 'SR', icon: '皿', desc: '吸人内功，损人利己。', attr: '吸取' },
+                        { id: 19, name: '聚灵石', rank: 'R', icon: '🪨', desc: '聚集微弱灵气。', attr: '修炼' },
+                        { id: 20, name: '铁线网', rank: 'R', icon: '🕸️', desc: '捕获灵兽之用。', attr: '捕捉' },
+                        { id: 21, name: '玄黄塔', rank: 'UR', icon: '🗼', desc: '玄黄母气，万劫不磨。', attr: '全御' },
+                        { id: 22, name: '龙鳞刃', rank: 'SSR', icon: '🗡️', desc: '蛟龙之鳞，破甲如泥。', attr: '穿透' },
+                        { id: 23, name: '紫云炉', rank: 'SR', icon: '🔥', desc: '炼丹圣品，丹香四溢。', attr: '效率' },
+                    ],
+                    '灵界古宝': [
+                        { id: 101, name: '斩灵剑', rank: 'UR', icon: '⚔️', desc: '一剑挥出，虚空震裂。', attr: '穿透' },
+                        { id: 102, name: '七宝妙树', rank: 'UR', icon: '🌳', desc: '无物不刷。', attr: '全能' },
+                        { id: 103, name: '太极图', rank: 'UR', icon: '☯️', desc: '定住阴阳，重划混沌。', attr: '防御' },
+                        { id: 104, name: '万宝轮', rank: 'SSR', icon: '☸️', desc: '缩短冷却。', attr: '急速' },
+                        { id: 105, name: '紫金葫芦', rank: 'SSR', icon: '🍶', desc: '吸纳敌方神魂。', attr: '吸血' },
+                        { id: 106, name: '翻天印', rank: 'SSR', icon: '🧱', desc: '封禁虚空。', attr: '压制' },
+                        { id: 107, name: '招妖幡', rank: 'UR', icon: '🚩', desc: '号令群妖，莫敢不从。', attr: '统帅' },
+                        { id: 108, name: '阴阳镜', rank: 'SSR', icon: '🪞', desc: '照人即死，转面即生。', attr: '生死' },
+                        { id: 109, name: '破界梭', rank: 'SR', icon: '🚀', desc: '破开禁制。', attr: '破障' },
+                        { id: 110, name: '落魂铃', rank: 'SR', icon: '🔕', desc: '神魂干扰。', attr: '神识' },
+                        { id: 111, name: '寒冰尺', rank: 'R', icon: '📏', desc: '玄冰打造。', attr: '冰霜' },
+                        { id: 112, name: '烈火旗', rank: 'R', icon: '🎌', desc: '真火灼烧。', attr: '火焰' },
+                        { id: 113, name: '定海珠', rank: 'UR', icon: '🔮', desc: '二十四颗，自成诸天。', attr: '法伤' },
+                        { id: 114, name: '斩仙飞刀', rank: 'UR', icon: '🏺', desc: '请宝贝转身！', attr: '斩杀' },
+                    ],
+                };
+
+                const rankColors = {
+                    'UR': 'from-red-600 to-orange-500 shadow-red-500/20',
+                    'SSR': 'from-orange-500 to-yellow-400 shadow-orange-500/20',
+                    'SR': 'from-purple-600 to-pink-500 shadow-purple-500/20',
+                    'R': 'from-blue-500 to-cyan-400 shadow-blue-500/20',
+                };
+
+                // 数值平衡微调：指数增长底数
+                // UR 1.5倍每级，SSR 1.3倍每级
+                const rankGrowth = {
+                    'UR': 1.50,
+                    'SSR': 1.30,
+                    'SR': 1.15,
+                    'R': 1.05
+                };
+
+                // 预计算 Log10 成长率，优化计算性能
+                const rankGrowthLog = {
+                    'UR': Math.log10(1.50),
+                    'SSR': Math.log10(1.30),
+                    'SR': Math.log10(1.15),
+                    'R': Math.log10(1.05)
+                };
+
+                const activeTab = ref('凡界古宝');
+                const playerData = ref({});
+                const selectedId = ref(null);
+                const isDrawing = ref(false);
+                const showResult = ref(false);
+                const drawResults = ref([]);
+                const pityCount = ref(35);
+                const toastMsg = ref("");
+
+                const totalCount = computed(() => Object.values(library).flat().length);
+                const collectedCount = computed(() => Object.values(playerData.value).filter(p => p.level > 0).length);
+
+                const filteredLibrary = (rank) => {
+                    return library[activeTab.value].filter(i => i.rank === rank);
+                };
+
+                const isUnlocked = (id) => playerData.value[id]?.level > 0;
+                const hasShards = (id) => playerData.value[id]?.shards > 0;
+
+                const selectedItem = computed(() => {
+                    return Object.values(library).flat().find(i => i.id === selectedId.value);
+                });
+
+                const selectedStats = computed(() => {
+                    return playerData.value[selectedId.value] || { shards: 0, level: 0, tier: 1 };
+                });
+
+                const getTotalLevel = (id) => {
+                    const data = playerData.value[id];
+                    if (!data) return 0;
+                    return (data.tier - 1) * 10 + data.level;
+                };
+
+                // 普通单体计算（用于显示小数值，<1e308）
+                const calculateSinglePower = (id, extraLevel = 0) => {
+                    const item = Object.values(library).flat().find(i => i.id === id);
+                    const level = getTotalLevel(id) + extraLevel;
+                    if (!item || level === 0) return 1;
+                    return Math.pow(rankGrowth[item.rank], level);
+                };
+
+                // 核心算法：计算 Log10 形式的总战力
+                // Log(A * B) = Log(A) + Log(B)
+                // 总战力 Log = sum(每个古宝的 Log)
+                // 单个古宝 Log = 等级 * Log(成长率)
+                const totalLog10Power = computed(() => {
+                    let totalLog = 0;
+                    Object.keys(playerData.value).forEach(id => {
+                        const item = Object.values(library).flat().find(i => i.id == id);
+                        if(item) {
+                            const level = getTotalLevel(id);
+                            if(level > 0) {
+                                totalLog += level * rankGrowthLog[item.rank];
+                            }
+                        }
+                    });
+                    return totalLog;
+                });
+
+                // 计算当前Tab的 Log10 战力
+                const tabLog10Power = (tabName) => {
+                    let totalLog = 0;
+                    library[tabName].forEach(item => {
+                        const data = playerData.value[item.id];
+                        if (data && data.level > 0) {
+                            const level = (data.tier - 1) * 10 + data.level;
+                            totalLog += level * rankGrowthLog[item.rank];
+                        }
+                    });
+                    return totalLog;
+                };
+
+                // 通用大数值格式化
+                const formatNumber = (num) => {
+                    if (num < 10000) return num.toFixed(2);
+                    return num.toExponential(2).replace('+', ''); // 1.23e45
+                };
+
+                // Log10 格式化：将 Log 值转回科学计数法显示
+                // 如果 Log 值是 45.3，意味着实际值是 10^45.3
+                // 10^45.3 = 10^0.3 * 10^45 = 1.99 * 10^45 -> 1.99e45
+                const formatLog10 = (logValue) => {
+                    if (logValue < 4) { // 小于 10000 (10^4)
+                        return Math.pow(10, logValue).toFixed(2);
+                    }
+                    const exponent = Math.floor(logValue);
+                    const mantissa = Math.pow(10, logValue - exponent);
+                    return `${mantissa.toFixed(2)}e${exponent}`;
+                };
+
+                const showToast = (msg) => {
+                    toastMsg.value = msg;
+                    setTimeout(() => toastMsg.value = "", 2000);
+                };
+
+                const handleDraw = (count) => {
+                    if (isDrawing.value) return;
+                    isDrawing.value = true;
+                    setTimeout(() => {
+                        const pool = library[activeTab.value];
+                        const results = [];
+                        for (let i = 0; i < count; i++) {
+                            const selected = pool[Math.floor(Math.random() * pool.length)];
+                            if (!playerData.value[selected.id]) {
+                                playerData.value[selected.id] = { shards: 1, level: 0, tier: 1 };
+                            } else {
+                                playerData.value[selected.id].shards += 1;
+                            }
+                            results.push(selected);
+                        }
+                        drawResults.value = results;
+                        isDrawing.value = false;
+                        showResult.value = true;
+                        pityCount.value = Math.max(0, pityCount.value - count) === 0 ? 40 : pityCount.value - count;
+                        nextTick(() => lucide.createIcons());
+                    }, 500);
+                };
+
+                const handleUpgrade = (id) => {
+                    const data = playerData.value[id];
+                    if (!data || data.shards <= 0) return;
+                    data.shards -= 1;
+                    data.level += 1;
+                    if (data.level > 10) {
+                        data.level = 1;
+                        data.tier += 1;
+                    }
+                    showToast("炼化成功");
+                    nextTick(() => lucide.createIcons());
+                };
+
+                const handleGlobalQuickUpgrade = () => {
+                    let upgradedCount = 0;
+                    Object.keys(playerData.value).forEach(id => {
+                        const data = playerData.value[id];
+                        if (data.shards > 0) {
+                            const totalShards = data.shards;
+                            let currentLevel = data.level;
+                            let currentTier = data.tier;
+                            let totalPoints = (currentTier - 1) * 10 + currentLevel + totalShards;
+                            
+                            data.tier = Math.floor((totalPoints - 1) / 10) + 1;
+                            data.level = (totalPoints % 10) === 0 ? 10 : (totalPoints % 10);
+                            data.shards = 0;
+                            upgradedCount++;
+                        }
+                    });
+
+                    if (upgradedCount > 0) {
+                        showToast(`全员炼化完成，${upgradedCount}件古宝已强化`);
+                    } else {
+                        showToast("暂无碎片可供炼化");
+                    }
+                };
+
+                onMounted(() => {
+                    lucide.createIcons();
+                });
+
+                return {
+                    library, rankColors, activeTab, playerData, selectedId, 
+                    isDrawing, showResult, drawResults, pityCount, toastMsg,
+                    totalCount, collectedCount, rankGrowth, rankGrowthLog,
+                    filteredLibrary, isUnlocked, hasShards, selectedItem, selectedStats,
+                    handleDraw, handleUpgrade, handleGlobalQuickUpgrade,
+                    getTotalLevel, calculateSinglePower, formatNumber, formatLog10, totalLog10Power, tabLog10Power
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

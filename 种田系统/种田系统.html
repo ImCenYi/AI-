@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修仙灵植园 - 挂机种田</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background-color: #111827;
+            background-image: radial-gradient(circle at 50% 50%, #1f2937 0%, #111827 100%);
+            color: #d1d5db;
+        }
+
+        /* 土地网格 */
+        .land-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr); 
+            gap: 0.5rem;
+        }
+        @media (max-width: 768px) {
+            .land-grid { grid-template-columns: repeat(4, 1fr); } 
+        }
+
+        /* 选中种子动画 */
+        .selected-seed {
+            border-color: #f59e0b !important;
+            background-color: rgba(245, 158, 11, 0.1);
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+        }
+        
+        /* 铲子模式：全局警告 */
+        .shovel-mode-active {
+            border: 2px dashed #ef4444 !important;
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+        
+        /* 铲子模式下的光标 */
+        .cursor-shovel .land-item {
+            cursor: no-drop !important; 
+        }
+
+        /* 浮动文字 */
+        .float-text {
+            position: absolute;
+            animation: floatUp 1.2s ease-out forwards;
+            pointer-events: none;
+            font-weight: bold;
+            z-index: 50;
+            text-shadow: 1px 1px 2px black;
+            font-size: 0.8rem;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+
+        /* 傀儡工作的光效 */
+        .puppet-working {
+            box-shadow: inset 0 0 10px rgba(168, 85, 247, 0.5);
+            border-color: #a855f7 !important;
+        }
+
+        /* 自定义滚动条 */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="h-screen overflow-hidden flex flex-col p-2">
+
+<div id="app" class="flex-1 flex flex-col md:flex-row max-w-7xl mx-auto w-full gap-3 h-full">
+
+    <!-- 左侧：药园主界面 -->
+    <div class="flex-[2] flex flex-col gap-2 bg-gray-900 border border-gray-700 rounded-xl p-3 shadow-2xl relative overflow-hidden h-full">
+        
+        <!-- 顶部状态栏 -->
+        <div class="flex justify-between items-end border-b border-gray-700 pb-2 z-10 shrink-0">
+            <div>
+                <h1 class="text-xl font-bold text-yellow-500 tracking-widest flex items-center"><i class="fas fa-leaf mr-2"></i>百草灵园</h1>
+                <div class="text-xs mt-1 flex items-center gap-2">
+                    <span class="px-1.5 py-0.5 bg-gray-800 rounded border border-gray-600 text-blue-300">{{ currentRealm }}</span>
+                    <span class="text-gray-400">修为: {{ formatNumber(cultivation) }} / {{ formatNumber(maxCultivation) }}</span>
+                </div>
+                <div class="w-40 h-1 bg-gray-800 rounded-full mt-1 overflow-hidden">
+                    <div class="h-full bg-blue-600 transition-all duration-500" :style="{ width: (cultivation/maxCultivation*100) + '%' }"></div>
+                </div>
+            </div>
+            <div class="text-right">
+                <div class="text-xl font-bold text-yellow-400 font-mono">
+                    {{ formatNumber(spiritStones) }} <span class="text-xs text-gray-500">灵石</span>
+                </div>
+                <div class="text-[10px] text-green-500" v-if="incomeRate > 0">
+                    <i class="fas fa-arrow-up"></i> {{ formatNumber(incomeRate) }}/分
+                </div>
+            </div>
+        </div>
+
+        <!-- 浮动文字层 -->
+        <div class="absolute inset-0 pointer-events-none overflow-hidden z-50">
+            <div v-for="text in floatingTexts" :key="text.id" class="float-text" 
+                 :style="{ left: text.x + 'px', top: text.y + 'px', color: text.color }">
+                {{ text.content }}
+            </div>
+        </div>
+
+        <!-- 土地展示区 -->
+        <div class="flex-1 overflow-y-auto p-2 bg-gray-800/30 rounded-lg border border-gray-700/50 relative transition-all duration-300"
+             :class="{'shovel-mode-active cursor-shovel': selectedSeedId === -1}">
+            
+            <div class="land-grid">
+                <div v-for="(land, index) in lands" :key="index" 
+                     class="land-item aspect-square relative rounded border transition-all duration-200 cursor-pointer group select-none flex flex-col items-center justify-center p-1"
+                     :class="[getLandStyle(land), {'puppet-working': autoMode && land.unlocked && realmLevel >= 1}]"
+                     @click="handleLandClick(index, $event)">
+                    
+                    <!-- 1. 未解锁 -->
+                    <div v-if="!land.unlocked" class="text-center opacity-60">
+                        <i class="fas fa-lock text-xl mb-1"></i>
+                        <div class="text-[10px] font-mono text-yellow-600">{{ formatNumber(land.unlockCost) }}</div>
+                    </div>
+
+                    <!-- 2. 空闲 (显示上一次种植的记忆) -->
+                    <div v-else-if="!land.plant" class="text-center text-gray-600 group-hover:text-green-500 transition-colors">
+                        <div v-if="autoMode && land.lastSeedId && realmLevel >= 1" class="animate-pulse text-purple-400">
+                            <i class="fas fa-magic text-xl"></i>
+                            <div class="text-[10px] scale-75">补种中...</div>
+                        </div>
+                        <div v-else>
+                            <i class="fas fa-plus-circle text-2xl opacity-30 group-hover:opacity-100"></i>
+                            <div class="text-[10px] mt-1 opacity-0 group-hover:opacity-100">种植</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. 生长中/成熟 -->
+                    <div v-else class="w-full h-full flex flex-col items-center justify-center relative gap-1">
+                        
+                        <!-- 铲子模式下的红色叉叉 -->
+                        <div v-if="selectedSeedId === -1" class="absolute inset-0 bg-red-900/60 z-20 flex items-center justify-center animate-pulse rounded border-2 border-red-500">
+                            <i class="fas fa-trash-alt text-white text-3xl"></i>
+                        </div>
+
+                        <div class="text-2xl transition-transform duration-500 transform" 
+                             :class="land.progress >= 100 ? 'scale-110 drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'scale-90 opacity-80'">
+                            {{ land.plant.icon }}
+                        </div>
+                        
+                        <div v-if="land.progress < 100" class="w-full h-1 bg-gray-900 rounded-full overflow-hidden absolute bottom-1 left-0 px-1">
+                            <div class="h-full bg-green-500 transition-all duration-300 rounded-full" :style="{ width: land.progress + '%' }"></div>
+                        </div>
+                        
+                        <div v-if="land.progress >= 100" class="absolute top-1 right-1">
+                            <span class="flex h-2 w-2">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部操作栏 -->
+        <div class="grid grid-cols-4 gap-2 h-12 shrink-0 mt-2">
+            <button @click="oneClickHarvest" class="bg-green-800 hover:bg-green-700 text-green-100 rounded text-xs border-b-2 border-green-950 active:border-b-0 active:translate-y-0.5 transition-all flex flex-col items-center justify-center">
+                <i class="fas fa-hand-holding-dollar mb-1"></i> <span>一键收获</span>
+            </button>
+            
+            <button @click="oneClickPlant" 
+                    :disabled="selectedSeedId === -1"
+                    class="bg-blue-800 hover:bg-blue-700 text-blue-100 rounded text-xs border-b-2 border-blue-950 active:border-b-0 active:translate-y-0.5 transition-all flex flex-col items-center justify-center disabled:opacity-50">
+                <i class="fas fa-seedling mb-1"></i> <span>一键种植</span>
+            </button>
+            
+            <button @click="oneClickClear" class="bg-red-900 hover:bg-red-800 text-red-100 rounded text-xs border-b-2 border-black active:border-b-0 active:translate-y-0.5 transition-all flex flex-col items-center justify-center">
+                <i class="fas fa-trash-alt mb-1"></i> <span>铲除未熟</span>
+            </button>
+            
+            <!-- 傀儡托管 -->
+            <div class="bg-gray-800 rounded border border-gray-600 flex flex-col items-center justify-center relative overflow-hidden cursor-pointer hover:bg-gray-750" 
+                 :class="{'opacity-50 cursor-not-allowed': realmLevel < 1, 'border-purple-500 ring-1 ring-purple-500 bg-gray-800': autoMode}"
+                 @click="realmLevel >= 1 ? autoMode = !autoMode : null">
+                
+                <i class="fas mb-1" :class="autoMode ? 'fa-robot text-purple-400' : 'fa-robot text-gray-500'"></i>
+                <span class="text-xs select-none" :class="autoMode ? 'text-purple-200' : 'text-gray-400'">
+                    傀儡托管 <span v-if="autoMode" class="text-green-400 ml-1">ON</span>
+                </span>
+
+                <div v-if="realmLevel < 1" class="absolute inset-0 bg-black/80 flex items-center justify-center text-[10px] text-red-400 z-20 backdrop-blur-sm">
+                    筑基解锁
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：功能面板 -->
+    <div class="flex-1 md:flex-[1] flex flex-col gap-3 min-w-[280px] h-full overflow-hidden">
+        
+        <!-- 灵植商店 -->
+        <div class="flex-[2] bg-gray-900 border border-gray-700 rounded-xl p-3 flex flex-col min-h-0">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-2 mb-2 shrink-0">
+                <h2 class="font-bold text-gray-200 text-sm"><i class="fas fa-store text-yellow-600 mr-2"></i>灵植阁</h2>
+                <span class="text-[10px] text-gray-500" v-if="selectedSeedId === -1">⚠️ 铲除模式已激活</span>
+                <span class="text-[10px] text-gray-500" v-else>点击购买种子</span>
+            </div>
+            
+            <!-- 工具区 -->
+            <div class="pb-2 mb-2 border-b border-gray-700 shrink-0">
+                <div @click="selectedSeedId = -1"
+                     class="p-2 rounded border transition-all cursor-pointer flex items-center justify-between group shadow-sm"
+                     :class="selectedSeedId === -1 ? 'bg-red-900/50 border-red-500 ring-1 ring-red-500' : 'border-gray-700 bg-gray-800 hover:bg-gray-700'">
+                    <div class="flex items-center gap-3">
+                        <div class="text-2xl w-8 text-center">⛏️</div>
+                        <div>
+                            <div class="text-sm font-bold text-red-400">玉灵铲</div>
+                            <div class="text-[10px] text-gray-400">点击植物单体移除</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-red-500 font-bold" v-if="selectedSeedId === -1">
+                        <i class="fas fa-check"></i> 使用中
+                    </div>
+                </div>
+            </div>
+
+            <!-- 种子列表 -->
+            <div class="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scroll">
+                <div v-for="seed in availableSeeds" :key="seed.id"
+                     @click="selectSeed(seed.id)"
+                     class="relative p-1.5 rounded border transition-all cursor-pointer flex items-center justify-between group"
+                     :class="selectedSeedId === seed.id ? 'selected-seed bg-gray-800' : 'border-gray-700 bg-gray-800/40 hover:bg-gray-800'">
+                    
+                    <div class="flex items-center gap-2">
+                        <div class="text-xl w-8 text-center">{{ seed.icon }}</div>
+                        <div>
+                            <div class="text-xs font-bold" :class="getQualityColor(seed.quality)">{{ seed.name }}</div>
+                            <div class="text-[10px] text-gray-500 flex gap-2">
+                                <span><i class="far fa-clock"></i> {{ seed.time }}s</span>
+                                <span><i class="fas fa-arrow-up"></i> {{ seed.exp }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-right leading-tight">
+                        <div class="text-[10px] text-red-400 font-mono">-{{ formatNumber(seed.cost) }}</div>
+                        <div class="text-[10px] text-green-400 font-mono">+{{ formatNumber(seed.income) }}</div>
+                    </div>
+
+                    <div v-if="selectedSeedId === seed.id" class="absolute right-0 top-0 text-yellow-500 text-[10px] p-0.5">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                </div>
+
+                <div v-if="nextUnlockSeed" class="p-2 border border-dashed border-gray-700 rounded text-center text-gray-500 text-[10px] mt-2">
+                    <i class="fas fa-lock mb-1"></i>
+                    下级 [{{ nextUnlockSeed.name }}] 需 <span class="text-blue-400">{{ REALMS[nextUnlockSeed.reqRealm] }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统与设置 (原产业链扩展) -->
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-3 shrink-0">
+            <h2 class="font-bold text-gray-200 mb-2 border-b border-gray-700 pb-1 text-sm flex justify-between">
+                <span><i class="fas fa-cogs text-gray-400 mr-2"></i>系统设置</span>
+                <span class="text-[10px] text-gray-500">每5秒自动存档</span>
+            </h2>
+            <div class="space-y-2 text-xs">
+                
+                <!-- 产业链：炼丹 -->
+                <div class="flex justify-between items-center" :class="{'opacity-50': realmLevel < 3}">
+                    <div>
+                        <div class="text-gray-300">丹火提炼 <span class="text-yellow-500 text-[10px]">+20%收益</span></div>
+                    </div>
+                    <div v-if="realmLevel < 3" class="text-[10px] text-red-500">需金丹期</div>
+                    <div v-else @click="alchemyMode = !alchemyMode" class="cursor-pointer">
+                        <i class="fas text-lg transition-colors" :class="alchemyMode ? 'fa-toggle-on text-purple-500' : 'fa-toggle-off text-gray-500'"></i>
+                    </div>
+                </div>
+
+                <!-- 手动存档操作区 -->
+                <div class="flex gap-2 mt-2 pt-2 border-t border-gray-800">
+                    <button @click="manualSave" class="flex-1 bg-blue-900 hover:bg-blue-800 text-blue-100 py-1 px-2 rounded text-[10px] flex items-center justify-center gap-1 transition-colors">
+                        <i class="fas fa-save"></i> 手动存档
+                    </button>
+                    <button @click="resetData" class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-100 py-1 px-2 rounded text-[10px] flex items-center justify-center gap-1 transition-colors border border-red-900">
+                        <i class="fas fa-redo"></i> 删档重修
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 日志窗口 -->
+        <div class="flex-[1] bg-black/80 rounded-xl p-2 overflow-y-auto text-[10px] font-mono border border-gray-800 min-h-[80px]" ref="logContainer">
+            <div v-for="(log, i) in logs" :key="i" class="mb-0.5 border-b border-gray-800/50 pb-0.5 last:border-0">
+                <span class="text-gray-500">[{{ log.time }}]</span> 
+                <span :class="log.color">{{ log.msg }}</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+
+    // 配置数据
+    const REALMS = ["练气", "筑基", "金丹", "元婴", "化神", "炼虚", "合体", "大乘", "渡劫", "飞升"];
+    const SEEDS = [
+        { id: 1, name: "凝气草", quality: 0, icon: "🌿", time: 3, cost: 10, income: 15, exp: 1, reqRealm: 0 },
+        { id: 2, name: "血菩提", quality: 1, icon: "🍒", time: 5, cost: 50, income: 80, exp: 3, reqRealm: 0 },
+        { id: 3, name: "玄冰花", quality: 2, icon: "❄️", time: 10, cost: 200, income: 350, exp: 10, reqRealm: 1 },
+        { id: 4, name: "紫金藤", quality: 3, icon: "🎋", time: 20, cost: 1000, income: 1800, exp: 50, reqRealm: 2 },
+        { id: 5, name: "龙鳞果", quality: 4, icon: "🐲", time: 45, cost: 5000, income: 9500, exp: 200, reqRealm: 3 },
+        { id: 6, name: "悟道茶", quality: 5, icon: "🍵", time: 90, cost: 20000, income: 40000, exp: 800, reqRealm: 4 },
+        { id: 7, name: "混沌莲", quality: 5, icon: "🪷", time: 180, cost: 100000, income: 250000, exp: 3000, reqRealm: 5 },
+    ];
+
+    createApp({
+        setup() {
+            // 核心数据
+            const spiritStones = ref(100);
+            const cultivation = ref(0);
+            const realmLevel = ref(0);
+            const autoMode = ref(false); // 傀儡托管开关
+            const alchemyMode = ref(false); // 炼丹模式开关
+            const selectedSeedId = ref(1);
+            
+            // 土地数据 (16块地，初始解锁4块)，增加 lastSeedId 字段记忆
+            const lands = ref(Array.from({ length: 16 }, (_, i) => ({
+                id: i,
+                unlocked: i < 4,
+                unlockCost: Math.floor(200 * Math.pow(2.5, i)),
+                plant: null, 
+                progress: 0,
+                lastSeedId: null // 记忆最后一次种植的种子ID
+            })));
+
+            // UI 辅助
+            const logs = ref([]);
+            const floatingTexts = ref([]);
+            const logContainer = ref(null);
+
+            // 计算属性
+            const maxCultivation = computed(() => Math.floor(100 * Math.pow(3, realmLevel.value)));
+            const currentRealm = computed(() => REALMS[Math.min(realmLevel.value, REALMS.length - 1)]);
+            const availableSeeds = computed(() => SEEDS.filter(s => s.reqRealm <= realmLevel.value));
+            const nextUnlockSeed = computed(() => SEEDS.find(s => s.reqRealm > realmLevel.value));
+            
+            // 预估收益 (每分钟)
+            const incomeRate = computed(() => {
+                // 如果是铲子模式，不计算预览收益
+                if (selectedSeedId.value === -1) return 0;
+                
+                const seed = SEEDS.find(s => s.id === selectedSeedId.value);
+                if (!seed) return 0;
+                const activeLands = lands.value.filter(l => l.unlocked).length;
+                const profitPerHarvest = seed.income - seed.cost;
+                const harvestsPerMin = 60 / seed.time;
+                let total = activeLands * profitPerHarvest * harvestsPerMin;
+                if (alchemyMode.value) total *= 1.2;
+                return Math.floor(total);
+            });
+
+            const formatNumber = (num) => {
+                if (num >= 100000000) return (num / 100000000).toFixed(2) + '亿';
+                if (num >= 10000) return (num / 10000).toFixed(1) + '万';
+                return Math.floor(num);
+            };
+
+            const getQualityColor = (q) => {
+                return ['text-gray-300', 'text-green-400', 'text-blue-400', 'text-purple-400', 'text-yellow-400', 'text-red-500'][q] || 'text-gray-300';
+            };
+
+            const getLandStyle = (land) => {
+                if (!land.unlocked) return 'bg-black/40 border-gray-800';
+                if (!land.plant) return 'bg-gray-800 border-gray-600 hover:border-gray-400';
+                if (land.progress >= 100) return 'bg-gray-800 border-yellow-500 shadow-[inset_0_0_20px_rgba(234,179,8,0.2)]';
+                return 'bg-gray-800 border-green-800';
+            };
+
+            const addLog = (msg, color = 'text-gray-300') => {
+                const time = new Date().toLocaleTimeString('zh-CN', { hour12: false });
+                logs.value.unshift({ time, msg, color });
+                if (logs.value.length > 30) logs.value.pop();
+            };
+
+            const addFloat = (x, y, content, color) => {
+                const id = Date.now() + Math.random();
+                floatingTexts.value.push({ id, x, y, content, color });
+                setTimeout(() => floatingTexts.value = floatingTexts.value.filter(t => t.id !== id), 1200);
+            };
+
+            // 核心：点击土地
+            const handleLandClick = (index, event) => {
+                const land = lands.value[index];
+                const rect = event.target.getBoundingClientRect();
+                const centerX = rect.left + rect.width / 2;
+                const centerY = rect.top + rect.height / 2;
+
+                // 铲除逻辑 (-1 代表铲子)
+                if (selectedSeedId.value === -1) {
+                    if (land.plant) {
+                        // 回收80%成本
+                        const refund = Math.floor(land.plant.cost * 0.8);
+                        spiritStones.value += refund;
+                        
+                        land.plant = null;
+                        land.progress = 0;
+                        land.lastSeedId = null; // 铲除后清除记忆，防止自动补种
+                        
+                        addLog(`移除灵植，回收 ${refund} 灵石`, 'text-blue-400');
+                        addFloat(centerX, centerY, `+${refund} (回收)`, '#60a5fa');
+                    }
+                    return;
+                }
+
+                if (!land.unlocked) {
+                    if (spiritStones.value >= land.unlockCost) {
+                        spiritStones.value -= land.unlockCost;
+                        land.unlocked = true;
+                        addLog(`开辟灵田成功，消耗 ${formatNumber(land.unlockCost)} 灵石`, 'text-yellow-400');
+                        addFloat(centerX, centerY, '解锁成功', '#fbbf24');
+                    } else {
+                        addLog('灵石不足，无法开辟', 'text-red-400');
+                    }
+                    return;
+                }
+
+                if (land.plant && land.progress >= 100) {
+                    harvest(land, centerX, centerY);
+                    return;
+                }
+
+                if (!land.plant) {
+                    plant(land, selectedSeedId.value, centerX, centerY);
+                    return;
+                }
+            };
+
+            // 收获函数
+            const harvest = (land, x, y) => {
+                if (!land.plant) return;
+                
+                let money = land.plant.income;
+                if (alchemyMode.value && realmLevel.value >= 3) money = Math.floor(money * 1.2);
+                const exp = land.plant.exp;
+
+                spiritStones.value += money;
+                cultivation.value += exp;
+
+                if (x && y) {
+                    addFloat(x, y - 20, `+${money}灵石`, '#fbbf24');
+                    addFloat(x, y - 40, `+${exp}修为`, '#4ade80');
+                }
+
+                // 记录这次种的是什么，用于自动补种
+                land.lastSeedId = land.plant.id;
+                
+                land.plant = null;
+                land.progress = 0;
+                checkLevelUp();
+            };
+
+            // 种植函数 (现在支持传入指定的 seedId)
+            const plant = (land, seedId, x, y) => {
+                const seed = SEEDS.find(s => s.id === seedId);
+                if (!seed) return;
+
+                if (spiritStones.value >= seed.cost) {
+                    spiritStones.value -= seed.cost;
+                    land.plant = { ...seed, startTime: Date.now() };
+                    land.progress = 0;
+                    // 更新记忆
+                    land.lastSeedId = seed.id;
+                    if (x && y) addFloat(x, y, `-${seed.cost}`, '#f87171');
+                } else {
+                    if(x) addLog('灵石不足，无法购买种子', 'text-red-500');
+                }
+            };
+
+            const checkLevelUp = () => {
+                if (cultivation.value >= maxCultivation.value) {
+                    cultivation.value -= maxCultivation.value;
+                    realmLevel.value++;
+                    addLog(`======= 境界突破！晋升为 [${currentRealm.value}] =======`, 'text-purple-400 font-bold');
+                    const bestSeed = SEEDS.filter(s => s.reqRealm <= realmLevel.value).pop();
+                    if (bestSeed) selectedSeedId.value = bestSeed.id;
+                }
+            };
+
+            const oneClickHarvest = (e) => {
+                let count = 0;
+                lands.value.forEach(l => {
+                    if (l.plant && l.progress >= 100) {
+                        harvest(l, e?.clientX, e?.clientY);
+                        count++;
+                    }
+                });
+                if (count > 0) addLog(`一键收获了 ${count} 株灵植`);
+            };
+
+            const oneClickPlant = (e) => {
+                let count = 0;
+                // 如果选中了铲子，不能一键种植
+                if (selectedSeedId.value === -1) {
+                    addLog('当前为铲子模式，无法种植', 'text-red-400');
+                    return;
+                }
+                const seed = SEEDS.find(s => s.id === selectedSeedId.value);
+                lands.value.forEach(l => {
+                    if (l.unlocked && !l.plant && spiritStones.value >= seed.cost) {
+                        plant(l, selectedSeedId.value, e?.clientX, e?.clientY);
+                        count++;
+                    }
+                });
+                if (count > 0) addLog(`一键种植了 ${count} 株 ${seed.name}`);
+            };
+
+            // 全场铲除逻辑 (即时执行，含回收)
+            const oneClickClear = () => {
+                let count = 0;
+                let totalRefund = 0;
+
+                lands.value.forEach(l => {
+                    // 只针对：已种植 且 未成熟 (<100)
+                    if (l.plant && l.progress < 100) {
+                        // 计算回收额
+                        totalRefund += Math.floor(l.plant.cost * 0.8);
+                        
+                        // 执行清除
+                        l.plant = null;
+                        l.progress = 0;
+                        l.lastSeedId = null; // 清除自动补种记忆
+                        count++;
+                    }
+                });
+                
+                if (count > 0) {
+                    spiritStones.value += totalRefund;
+                    addLog(`已铲除 ${count} 株生长中的灵植，回收 ${totalRefund} 灵石`, 'text-blue-400');
+                } else {
+                    addLog("当前没有正在生长的植物", "text-yellow-500");
+                }
+            };
+
+            const selectSeed = (id) => {
+                selectedSeedId.value = id;
+            };
+
+            // 存档保存逻辑 (V3)
+            const doSave = () => {
+                const data = {
+                    ss: spiritStones.value,
+                    cult: cultivation.value,
+                    rl: realmLevel.value,
+                    auto: autoMode.value,
+                    alch: alchemyMode.value,
+                    // 保存土地状态，包括植物
+                    lands: lands.value.map(l => ({ 
+                        unlocked: l.unlocked, 
+                        lastSeedId: l.lastSeedId,
+                        // 新增：保存植物状态
+                        plantSeedId: l.plant ? l.plant.id : null,
+                        plantStartTime: l.plant ? l.plant.startTime : null
+                    }))
+                };
+                localStorage.setItem('xianxia_save_v3', JSON.stringify(data));
+                return data;
+            };
+
+            const manualSave = () => {
+                doSave();
+                addLog('手动存档成功', 'text-green-400 font-bold');
+            };
+
+            const resetData = () => {
+                if(!confirm('确定要删档重修吗？所有进度将丢失！')) return;
+                localStorage.removeItem('xianxia_save_v3');
+                location.reload();
+            };
+
+            onMounted(() => {
+                const save = localStorage.getItem('xianxia_save_v3'); // 读取 V3 存档
+                if (save) {
+                    try {
+                        const data = JSON.parse(save);
+                        spiritStones.value = data.ss ?? 100;
+                        cultivation.value = data.cult ?? 0;
+                        realmLevel.value = data.rl ?? 0;
+                        autoMode.value = data.auto ?? false;
+                        alchemyMode.value = data.alch ?? false;
+                        if(data.lands) {
+                            data.lands.forEach((lData, i) => {
+                                if(lands.value[i]) {
+                                    lands.value[i].unlocked = lData.unlocked;
+                                    lands.value[i].lastSeedId = lData.lastSeedId;
+                                    
+                                    // 恢复植物状态
+                                    if (lData.plantSeedId) {
+                                        const seed = SEEDS.find(s => s.id === lData.plantSeedId);
+                                        if (seed) {
+                                            // 恢复植物对象
+                                            lands.value[i].plant = {
+                                                ...seed,
+                                                startTime: lData.plantStartTime
+                                            };
+                                            // 立即计算离线生长进度
+                                            const now = Date.now();
+                                            const elapsed = (now - lData.plantStartTime) / 1000;
+                                            lands.value[i].progress = Math.min(100, (elapsed / seed.time) * 100);
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    } catch(e) { console.error('存档损坏', e); }
+                }
+
+                setInterval(() => {
+                    const now = Date.now();
+                    
+                    // 生长逻辑
+                    lands.value.forEach(l => {
+                        if (l.plant && l.progress < 100) {
+                            const elapsed = (now - l.plant.startTime) / 1000;
+                            l.progress = Math.min(100, (elapsed / l.plant.time) * 100);
+                        }
+                    });
+
+                    // 自动化逻辑 (傀儡托管)
+                    if (autoMode.value && realmLevel.value >= 1) {
+                        lands.value.forEach(l => {
+                            // 1. 自动收获
+                            if (l.plant && l.progress >= 100) {
+                                harvest(l);
+                            }
+                            // 2. 自动补种 (使用记忆的 lastSeedId)
+                            if (l.unlocked && !l.plant && l.lastSeedId) {
+                                plant(l, l.lastSeedId);
+                            }
+                        });
+                    }
+
+                }, 100);
+
+                // 自动存档
+                setInterval(() => {
+                    doSave();
+                }, 5000);
+            });
+
+            return {
+                REALMS, spiritStones, cultivation, realmLevel, autoMode, alchemyMode,
+                maxCultivation, currentRealm, availableSeeds, nextUnlockSeed, incomeRate,
+                lands, logs, floatingTexts, selectedSeedId,
+                formatNumber, getQualityColor, getLandStyle,
+                handleLandClick, selectSeed, oneClickHarvest, oneClickPlant, oneClickClear,
+                manualSave, resetData
+            };
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

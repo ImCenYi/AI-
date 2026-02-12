@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大千宝录古宝系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #020617;
+            color: #f1f5f9;
+            overflow: hidden;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.1);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(59, 130, 246, 0.3);
+            border-radius: 10px;
+        }
+
+        .animate-ping-slow {
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .float-animation {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="min-h-screen flex items-center justify-center p-4 select-none">
+        <!-- 主界面容器 -->
+        <div class="relative w-full max-w-6xl aspect-[16/9] bg-[#0f172a] border border-slate-700/50 rounded-2xl shadow-2xl flex overflow-hidden">
+            
+            <!-- 1. 左侧页签栏 -->
+            <div class="w-20 bg-[#020617]/50 border-r border-slate-800 flex flex-col items-center py-6 gap-8">
+                <div class="w-12 h-12 rounded-full bg-blue-600/20 flex items-center justify-center text-blue-500">
+                    <i data-lucide="trophy" size="24"></i>
+                </div>
+                <div class="flex-1 flex flex-col gap-4">
+                    <button 
+                        v-for="(items, tabName) in library" 
+                        :key="tabName"
+                        @click="activeTab = tabName; selectedId = null"
+                        :class="['w-12 h-12 rounded-xl flex items-center justify-center transition-all', activeTab === tabName ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300']"
+                    >
+                        <span class="text-[10px] font-bold" style="writing-mode: vertical-rl;">{{ tabName.slice(0, 2) }}</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 中间图鉴列表 -->
+            <div class="flex-1 bg-slate-900/20 p-8 overflow-y-auto custom-scrollbar">
+                <div class="mb-8 flex justify-between items-end">
+                    <div>
+                        <h2 class="text-2xl font-black tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-500 uppercase">
+                            万 代 古 宝 库
+                        </h2>
+                        <p class="text-[10px] text-blue-500 font-mono mt-1 italic tracking-widest">COLLECTION OF ANCIENT POWER</p>
+                    </div>
+                </div>
+
+                <!-- 分品质渲染 -->
+                <div v-for="rank in ['UR', 'SSR', 'SR', 'R']" :key="rank" class="mb-10">
+                    <div v-if="filteredLibrary(rank).length" class="flex items-center gap-3 mb-6">
+                        <span :class="['text-[10px] font-black px-2 py-0.5 rounded text-white bg-gradient-to-r', rankColors[rank]]">{{ rank }}</span>
+                        <div class="h-[1px] flex-1 bg-slate-800"></div>
+                    </div>
+                    
+                    <div class="grid grid-cols-4 gap-6">
+                        <div 
+                            v-for="item in filteredLibrary(rank)" 
+                            :key="item.id"
+                            @click="selectedId = item.id"
+                            :class="['relative group cursor-pointer transition-all', selectedId === item.id ? 'scale-105' : '']"
+                        >
+                            <div :class="['relative aspect-square rounded-2xl border-2 transition-all p-3 overflow-hidden', 
+                                selectedId === item.id ? 'border-blue-500 bg-blue-500/10' : 'border-slate-800 bg-slate-900/50 hover:border-slate-600',
+                                !isUnlocked(item.id) ? 'grayscale opacity-40' : '']">
+                                
+                                <!-- 红点提示 -->
+                                <div v-if="hasShards(item.id)" class="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse shadow-[0_0_8px_red] z-20"></div>
+
+                                <!-- 等级信息 -->
+                                <div v-if="isUnlocked(item.id)" class="absolute top-2 left-2 flex flex-col items-start z-10">
+                                    <span class="text-[8px] font-bold text-blue-400 leading-none">{{ playerData[item.id].tier }}重</span>
+                                    <span class="text-[10px] font-black text-white">{{ playerData[item.id].level }}阶</span>
+                                </div>
+
+                                <div class="w-full h-full flex items-center justify-center text-4xl transform group-hover:rotate-12 transition-transform">
+                                    {{ item.icon }}
+                                </div>
+
+                                <!-- 未解锁且有碎片提示 -->
+                                <div v-if="!isUnlocked(item.id) && hasShards(item.id)" class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-[1px]">
+                                    <span class="text-[10px] font-bold text-orange-400">可激活 ({{ playerData[item.id].shards }})</span>
+                                </div>
+                            </div>
+                            <p :class="['text-center mt-3 text-xs font-bold tracking-tighter', selectedId === item.id ? 'text-blue-400' : 'text-slate-400']">
+                                {{ item.name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 右侧详情/抽奖面板 -->
+            <div class="w-80 bg-[#020617] border-l border-slate-800 flex flex-col">
+                <!-- 抽奖初始页 -->
+                <div v-if="!selectedId" class="flex-1 flex flex-col">
+                    <div class="p-6 flex-1 flex flex-col">
+                        <div class="flex-1 rounded-2xl bg-gradient-to-b from-blue-900/20 to-transparent border border-blue-500/20 p-6 flex flex-col items-center justify-center text-center">
+                            <div class="relative w-32 h-32 mb-6 float-animation">
+                                <div class="absolute inset-0 bg-blue-500/10 blur-3xl animate-pulse"></div>
+                                <i data-lucide="flame" class="w-32 h-32 text-blue-600 opacity-40"></i>
+                                <i data-lucide="zap" class="absolute inset-0 m-auto w-16 h-16 text-blue-400"></i>
+                            </div>
+                            <h3 class="text-xl font-black italic tracking-widest text-white mb-2 uppercase">天 命 寻 宝</h3>
+                            <p class="text-[10px] text-slate-500 leading-relaxed px-4 uppercase tracking-tighter">
+                                消耗灵石，在 {{ activeTab }} 中感悟天地法则，寻觅古宝碎片。
+                            </p>
+                            
+                            <div class="mt-8 flex flex-col items-center gap-1">
+                                <div class="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-[10px] text-blue-400 font-bold">
+                                    UR保底进度: {{ pityCount }}/40
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 grid grid-cols-2 gap-3 bg-slate-900/30">
+                        <button @click="handleDraw(1)" class="py-4 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold hover:bg-slate-700 active:scale-95 transition-all uppercase">
+                            探索一次
+                        </button>
+                        <button @click="handleDraw(10)" class="py-4 rounded-xl bg-blue-600 border border-blue-400 text-xs font-bold hover:bg-blue-500 active:scale-95 transition-all shadow-lg shadow-blue-900/20 uppercase">
+                            探索十次
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 古宝详情页 -->
+                <div v-else class="flex-1 flex flex-col animate-in slide-in-from-right duration-300">
+                    <div class="p-4 flex justify-between items-center border-b border-slate-800">
+                        <button @click="selectedId = null" class="text-slate-500 hover:text-white">
+                            <i data-lucide="x" size="20"></i>
+                        </button>
+                        <span class="text-[10px] font-bold text-slate-500 tracking-widest uppercase">Treasure Details</span>
+                        <i data-lucide="info" size="16" class="text-slate-500"></i>
+                    </div>
+
+                    <div class="flex-1 p-6 overflow-y-auto">
+                        <div class="flex flex-col items-center mb-8">
+                            <div :class="['w-32 h-32 rounded-3xl bg-gradient-to-br p-0.5 shadow-2xl mb-6', rankColors[selectedItem.rank]]">
+                                <div class="w-full h-full bg-[#0f172a] rounded-3xl flex items-center justify-center text-6xl">
+                                    {{ selectedItem.icon }}
+                                </div>
+                            </div>
+                            <h3 class="text-xl font-black text-white mb-1">{{ selectedItem.name }}</h3>
+                            <div class="flex items-center gap-1">
+                                <i v-for="i in Math.min(selectedStats.tier, 5)" :key="i" data-lucide="star" fill="#fbbf24" color="#fbbf24" class="w-2.5 h-2.5"></i>
+                                <span v-if="selectedStats.tier > 5" class="text-[10px] text-yellow-500">+{{ selectedStats.tier - 5 }}</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                                <h4 class="text-[10px] font-black text-blue-500 uppercase mb-2 tracking-widest">属性加成</h4>
+                                <div class="flex justify-between items-center text-sm">
+                                    <span class="text-slate-400">{{ selectedItem.attr }}</span>
+                                    <span class="text-blue-400 font-mono">+{{ ((selectedStats.tier - 1) * 10 + selectedStats.level * 1).toFixed(1) }}%</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                                <h4 class="text-[10px] font-black text-blue-500 uppercase mb-2 tracking-widest">古宝传记</h4>
+                                <p class="text-xs text-slate-500 leading-relaxed italic">
+                                    {{ selectedItem.desc }}。相传此物乃上古大能历经九九八十一难方才炼成。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6 border-t border-slate-800 bg-slate-900/30">
+                        <div class="mb-4">
+                            <div class="flex justify-between text-[10px] font-bold mb-1 px-1">
+                                <span class="text-slate-500 uppercase tracking-widest">注入进度</span>
+                                <span class="text-blue-400">{{ selectedStats.level }}/10</span>
+                            </div>
+                            <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                    class="h-full bg-gradient-to-r from-blue-600 to-cyan-400 shadow-[0_0_8px_#3b82f6] transition-all duration-500"
+                                    :style="{ width: (selectedStats.level / 10 * 100) + '%' }"
+                                ></div>
+                            </div>
+                        </div>
+
+                        <button 
+                            @click="handleUpgrade(selectedId)"
+                            :disabled="selectedStats.shards <= 0"
+                            :class="['w-full py-4 rounded-xl flex items-center justify-center gap-3 transition-all', 
+                                selectedStats.shards > 0 
+                                ? 'bg-orange-600 hover:bg-orange-500 text-white shadow-lg shadow-orange-900/20 active:scale-95' 
+                                : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50']"
+                        >
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs font-black uppercase tracking-widest">{{ selectedStats.level === 0 ? '激活古宝' : '注入灵气' }}</span>
+                                <span class="text-[9px] opacity-70 flex items-center gap-1 mt-0.5">
+                                    <i data-lucide="boxes" size="8"></i> 碎片消耗: 1 (拥有:{{ selectedStats.shards }})
+                                </span>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 结果弹窗 -->
+            <div v-if="showResult" class="absolute inset-0 z-50 bg-[#020617]/98 flex flex-col items-center justify-center fade-in duration-500">
+                <h2 class="text-2xl font-black italic tracking-[0.8em] text-white/50 mb-16 uppercase">寻 得 碎 片</h2>
+                <div :class="['grid gap-10', drawResults.length > 1 ? 'grid-cols-5' : 'grid-cols-1']">
+                    <div v-for="(item, idx) in drawResults" :key="idx" class="flex flex-col items-center">
+                        <div :class="['w-20 h-20 rounded-2xl bg-gradient-to-br p-[1px] relative shadow-2xl', rankColors[item.rank]]">
+                            <div class="w-full h-full bg-[#0f172a] rounded-2xl flex items-center justify-center text-3xl">
+                                {{ item.icon }}
+                                <div class="absolute -bottom-2 -right-2 bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-orange-400">x1</div>
+                            </div>
+                        </div>
+                        <p class="mt-6 text-xs font-bold text-slate-400">{{ item.name }}</p>
+                    </div>
+                </div>
+                <button @click="showResult = false" class="mt-20 text-[10px] font-bold text-slate-600 hover:text-white tracking-[0.5em] transition-all uppercase border-b border-transparent hover:border-white py-1">
+                    点击关闭宝库
+                </button>
+            </div>
+
+            <!-- 抽奖动画 -->
+            <div v-if="isDrawing" class="absolute inset-0 z-[60] bg-[#020617] flex items-center justify-center">
+                <div class="relative w-48 h-48 flex flex-col items-center justify-center gap-2">
+                    <div class="absolute inset-0 border border-blue-500/20 rounded-full animate-ping-slow"></div>
+                    <i data-lucide="zap" class="w-12 h-12 text-blue-500 animate-bounce"></i>
+                    <span class="text-[10px] font-black text-blue-400 tracking-widest animate-pulse uppercase">正在推演天机</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const library = {
+                    '凡界古宝': [
+                        { id: 1, name: '青竹蜂云剑', rank: 'UR', icon: '🗡️', desc: '增加木系神通伤害', attr: '攻击' },
+                        { id: 2, name: '虚天鼎', rank: 'UR', icon: '🍯', desc: '提升法宝防御效能', attr: '防御' },
+                        { id: 3, name: '混元钵', rank: 'SSR', icon: '🥣', desc: '自动回复少量真元', attr: '气血' },
+                        { id: 4, name: '风雷翅', rank: 'SSR', icon: '🦋', desc: '提升身法与闪避', attr: '敏捷' },
+                        { id: 5, name: '五行环', rank: 'SR', icon: '⭕', desc: '五行属性全面加持', attr: '全属性' },
+                        { id: 6, name: '白鳞盾', rank: 'R', icon: '🛡️', desc: '抵御凡间法术伤害', attr: '减伤' },
+                    ],
+                    '灵界古宝': [
+                        { id: 101, name: '斩灵剑', rank: 'UR', icon: '⚔️', desc: '无视敌方护甲防御', attr: '穿透' },
+                        { id: 102, name: '万宝轮', rank: 'SSR', icon: '☸️', desc: '缩短法宝冷却时间', attr: '急速' },
+                    ],
+                };
+
+                const rankColors = {
+                    'UR': 'from-red-600 to-orange-500 shadow-red-500/50',
+                    'SSR': 'from-orange-500 to-yellow-400 shadow-orange-500/50',
+                    'SR': 'from-purple-600 to-pink-500 shadow-purple-500/50',
+                    'R': 'from-blue-500 to-cyan-400 shadow-blue-500/50',
+                };
+
+                const activeTab = ref('凡界古宝');
+                const playerData = ref({});
+                const selectedId = ref(null);
+                const isDrawing = ref(false);
+                const showResult = ref(false);
+                const drawResults = ref([]);
+                const pityCount = ref(35);
+
+                const filteredLibrary = (rank) => {
+                    return library[activeTab.value].filter(i => i.rank === rank);
+                };
+
+                const isUnlocked = (id) => playerData.value[id]?.level > 0;
+                const hasShards = (id) => playerData.value[id]?.shards > 0;
+
+                const selectedItem = computed(() => {
+                    return Object.values(library).flat().find(i => i.id === selectedId.value);
+                });
+
+                const selectedStats = computed(() => {
+                    return playerData.value[selectedId.value] || { shards: 0, level: 0, tier: 1 };
+                });
+
+                const handleDraw = (count) => {
+                    if (isDrawing.value) return;
+                    isDrawing.value = true;
+
+                    setTimeout(() => {
+                        const pool = library[activeTab.value];
+                        const results = [];
+                        
+                        for (let i = 0; i < count; i++) {
+                            const selected = pool[Math.floor(Math.random() * pool.length)];
+                            if (!playerData.value[selected.id]) {
+                                playerData.value[selected.id] = { shards: 1, level: 0, tier: 1 };
+                            } else {
+                                playerData.value[selected.id].shards += 1;
+                            }
+                            results.push(selected);
+                        }
+
+                        drawResults.value = results;
+                        isDrawing.value = false;
+                        showResult.value = true;
+                        pityCount.value = pityCount.value - count <= 0 ? 40 : pityCount.value - count;
+                        
+                        // 重新渲染图标
+                        nextTick(() => lucide.createIcons());
+                    }, 800);
+                };
+
+                const handleUpgrade = (id) => {
+                    const data = playerData.value[id];
+                    if (!data || data.shards <= 0) return;
+
+                    data.shards -= 1;
+                    data.level += 1;
+                    if (data.level > 10) {
+                        data.level = 1;
+                        data.tier += 1;
+                    }
+                    nextTick(() => lucide.createIcons());
+                };
+
+                onMounted(() => {
+                    lucide.createIcons();
+                });
+
+                return {
+                    library, rankColors, activeTab, playerData, selectedId, 
+                    isDrawing, showResult, drawResults, pityCount,
+                    filteredLibrary, isUnlocked, hasShards, selectedItem, selectedStats,
+                    handleDraw, handleUpgrade
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

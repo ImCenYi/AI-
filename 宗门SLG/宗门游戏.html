@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>道天：宗门崛起 - 本地版</title>
+    <!-- 1. 引入 Tailwind CSS (负责漂亮的界面) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 2. 引入 React 和 ReactDOM (负责游戏逻辑) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- 3. 引入 Babel (负责把代码翻译给浏览器看) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* 自定义滚动条样式 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        body { background-color: #0f172a; color: #f1f5f9; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- 4. 游戏代码区域 -->
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- 简单的图标组件 (用 Emoji 代替) ---
+        const Pickaxe = () => <span className="mr-1">⛏️</span>;
+        const Scroll = () => <span className="mr-1">📜</span>;
+        const Users = () => <span className="mr-1">👥</span>;
+        const Building2 = () => <span className="mr-1">🛖</span>;
+        const Sword = () => <span className="mr-1">⚔️</span>;
+        const Leaf = () => <span className="mr-1">🌿</span>;
+        const Hammer = () => <span className="mr-1">🔨</span>;
+        const Zap = () => <span className="mr-1">⚡</span>;
+        const Coins = () => <span className="mr-1">💰</span>;
+        const Globe = () => <span className="mr-1">🌍</span>;
+        const Mountain = () => <span className="mr-1">🏔️</span>;
+        const ArrowUpCircle = () => <span className="mr-1">⬆️</span>;
+        const Activity = () => <span className="mr-1">🧠</span>;
+        const Box = () => <span className="mr-1">📦</span>;
+
+        // --- 游戏常量 ---
+        const REALMS = [
+            { name: '凡人', multiplier: 1, maxQi: 100 },
+            { name: '练气', multiplier: 2, maxQi: 1000 },
+            { name: '筑基', multiplier: 5, maxQi: 5000 },
+            { name: '金丹', multiplier: 12, maxQi: 20000 },
+            { name: '元婴', multiplier: 30, maxQi: 100000 },
+            { name: '化神', multiplier: 100, maxQi: 1000000 },
+        ];
+
+        const RESOURCES = {
+            spiritStones: { name: '灵石', icon: <Coins />, desc: '通用货币，蕴含灵气' },
+            wood: { name: '灵木', icon: <Building2 />, desc: '基础建筑材料' },
+            herbs: { name: '灵草', icon: <Leaf />, desc: '炼丹原材料' },
+            iron: { name: '玄铁', icon: <Hammer />, desc: '高级建筑与法宝材料' },
+            pills: { name: '聚气丹', icon: <Zap />, desc: '提升修为的关键丹药' },
+        };
+
+        const BUILDINGS = [
+            { id: 'dwelling', name: '弟子精舍', cost: { wood: 50 }, desc: '增加5名最大人口容量', effect: (state) => ({ maxPop: 5 }) },
+            { id: 'spiritField', name: '灵田', cost: { wood: 100, spiritStones: 50 }, desc: '种植灵草，需弟子照料', job: 'farmer' },
+            { id: 'lumberYard', name: '伐木场', cost: { spiritStones: 30 }, desc: '自动砍伐灵木', job: 'lumberjack' },
+            { id: 'mine', name: '玄铁矿洞', cost: { wood: 200, spiritStones: 100 }, desc: '开采玄铁', job: 'miner' },
+            { id: 'alchemyLab', name: '炼丹阁', cost: { wood: 300, iron: 50 }, desc: '消耗灵草炼制聚气丹', job: 'alchemist' },
+            { id: 'library', name: '藏经阁', cost: { wood: 500, iron: 100 }, desc: '产生悟性，用于研究科技', job: 'scholar' },
+        ];
+
+        const TECHS = [
+            { id: 'basic_array', name: '聚灵阵法', cost: 100, desc: '灵石获取效率 +20%' },
+            { id: 'advanced_farming', name: '灵植培育', cost: 250, desc: '灵田产出 +50%' },
+            { id: 'sword_flying', name: '御剑术', cost: 500, desc: '解锁外交与探索功能' },
+            { id: 'alchemy_mastery', name: '丹道精通', cost: 1000, desc: '炼丹效率翻倍' },
+        ];
+
+        const NEIGHBORS = [
+            { id: 1, name: '青云门', align: '正道', attitude: 50, desc: '传统正道大宗，由于你是新秀，对你持观望态度。' },
+            { id: 2, name: '血煞教', align: '魔道', attitude: -30, desc: '行事诡秘，经常觊觎你的资源。' },
+            { id: 3, name: '万宝楼', align: '中立', attitude: 100, desc: '唯利是图的商业组织。' },
+        ];
+
+        // --- 主程序 ---
+        function DaoistSkylines() {
+            const [activeTab, setActiveTab] = useState('sect');
+            const [logs, setLogs] = useState([{ text: "宗门初立，百废待兴。掌门请开始修炼。", type: 'info', id: 0 }]);
+            
+            // 游戏状态
+            const [res, setRes] = useState({ spiritStones: 0, wood: 0, herbs: 0, iron: 0, pills: 0, insight: 0 });
+            const [pop, setPop] = useState({ total: 1, assigned: {}, idle: 1, realmIdx: 0, qi: 0 }); 
+            const [buildings, setBuildings] = useState({ dwelling: 1, spiritField: 0, lumberYard: 0, mine: 0, alchemyLab: 0, library: 0 });
+            const [jobs, setJobs] = useState({ farmer: 0, lumberjack: 0, miner: 0, alchemist: 0, scholar: 0 });
+            const [techs, setTechs] = useState([]);
+
+            const maxPop = 5 + (buildings.dwelling * 5);
+            const currentRealm = REALMS[pop.realmIdx];
+            const nextRealm = REALMS[pop.realmIdx + 1];
+
+            const addLog = (text, type = 'info') => {
+                setLogs(prev => [{ text, type, id: Date.now() + Math.random() }, ...prev].slice(0, 20));
+            };
+
+            const formatNumber = (num) => Math.floor(num).toLocaleString();
+
+            // 游戏循环 (每秒)
+            useEffect(() => {
+                const tick = setInterval(() => {
+                setRes(prev => {
+                    const newRes = { ...prev };
+                    
+                    // 1. 基础产出 (掌门)
+                    let stoneGain = 1 * currentRealm.multiplier;
+                    if (techs.includes('basic_array')) stoneGain *= 1.2;
+                    newRes.spiritStones += stoneGain;
+
+                    // 2. 职业产出
+                    newRes.wood += jobs.lumberjack * 2;
+                    
+                    let herbGain = jobs.farmer * 1.5;
+                    if (techs.includes('advanced_farming')) herbGain *= 1.5;
+                    newRes.herbs += herbGain;
+
+                    newRes.iron += jobs.miner * 0.8;
+                    newRes.insight += jobs.scholar * 1;
+
+                    // 炼丹消耗
+                    if (jobs.alchemist > 0) {
+                        const herbCost = jobs.alchemist * 5;
+                        let pillProd = jobs.alchemist * 1;
+                        if (techs.includes('alchemy_mastery')) pillProd *= 2;
+
+                        if (newRes.herbs >= herbCost) {
+                            newRes.herbs -= herbCost;
+                            newRes.pills += pillProd;
+                        }
+                    }
+                    return newRes;
+                });
+
+                // 3. 修炼
+                setPop(prevP => {
+                    if (!nextRealm) return prevP;
+                    let cultivationSpeed = 5 * (buildings.dwelling * 0.1 + 1); 
+                    let newQi = prevP.qi + cultivationSpeed;
+                    if (newQi > currentRealm.maxQi) newQi = currentRealm.maxQi;
+                    return { ...prevP, qi: newQi };
+                });
+
+                }, 1000);
+                return () => clearInterval(tick);
+            }, [jobs, buildings, currentRealm, techs, nextRealm]);
+
+            // --- 交互函数 ---
+            const handleManualGather = () => {
+                setRes(prev => ({ ...prev, spiritStones: prev.spiritStones + 10 }));
+                addLog("掌门亲自下山化缘，获得 10 灵石。", 'success');
+            };
+
+            const handleBuild = (bId) => {
+                const b = BUILDINGS.find(x => x.id === bId);
+                if (!b) return;
+                for (const [key, val] of Object.entries(b.cost)) {
+                    if (res[key] < val) {
+                        addLog(`资源不足：缺少 ${RESOURCES[key]?.name || key}`, 'error');
+                        return;
+                    }
+                }
+                const newRes = { ...res };
+                for (const [key, val] of Object.entries(b.cost)) {
+                    newRes[key] -= val;
+                }
+                setRes(newRes);
+                setBuildings(prev => ({ ...prev, [bId]: prev[bId] + 1 }));
+                addLog(`建造了 ${b.name}`, 'success');
+            };
+
+            const handleRecruit = () => {
+                if (res.spiritStones < 50) {
+                    addLog("招募凡人弟子需要 50 灵石作为安家费。", 'error');
+                    return;
+                }
+                if (pop.total >= maxPop) {
+                    addLog("宗门住房不足，请升级弟子精舍。", 'error');
+                    return;
+                }
+                setRes(prev => ({ ...prev, spiritStones: prev.spiritStones - 50 }));
+                setPop(prev => ({ ...prev, total: prev.total + 1, idle: prev.idle + 1 }));
+                addLog("一名凡人仰慕宗门威名，拜入山门。", 'success');
+            };
+
+            const assignJob = (jobId, delta) => {
+                setJobs(prev => {
+                    const current = prev[jobId];
+                    if (delta > 0) {
+                        if (pop.idle > 0) {
+                            setPop(p => ({ ...p, idle: p.idle - 1 }));
+                            return { ...prev, [jobId]: current + 1 };
+                        }
+                    } else {
+                        if (current > 0) {
+                            setPop(p => ({ ...p, idle: p.idle + 1 }));
+                            return { ...prev, [jobId]: current - 1 };
+                        }
+                    }
+                    return prev;
+                });
+            };
+
+            const handleBreakthrough = () => {
+                if (!nextRealm) return;
+                if (pop.qi < currentRealm.maxQi) {
+                    addLog("修为未满，无法突破。", 'error');
+                    return;
+                }
+                const pillCost = (pop.realmIdx + 1) * 50;
+                if (res.pills < pillCost) {
+                    addLog(`突破需要 ${pillCost} 枚聚气丹护体。`, 'error');
+                    return;
+                }
+                setRes(prev => ({ ...prev, pills: prev.pills - pillCost }));
+                setPop(prev => ({ ...prev, realmIdx: prev.realmIdx + 1, qi: 0 }));
+                addLog(`天降祥瑞！掌门成功突破至 [${nextRealm.name}] 境界！`, 'gold');
+            };
+
+            const handleResearch = (techId) => {
+                const tech = TECHS.find(t => t.id === techId);
+                if (res.insight >= tech.cost) {
+                    setRes(prev => ({ ...prev, insight: prev.insight - tech.cost }));
+                    setTechs(prev => [...prev, techId]);
+                    addLog(`成功研习秘法：${tech.name}`, 'success');
+                } else {
+                    addLog("悟性不足，无法参透此法。", 'error');
+                }
+            };
+
+            const handleDiplomacy = (neighbor, action) => {
+                if (action === 'trade') {
+                    if (res.spiritStones >= 100) {
+                        setRes(prev => ({ ...prev, spiritStones: prev.spiritStones - 100, wood: prev.wood + 50, iron: prev.iron + 20 }));
+                        addLog(`与 ${neighbor.name} 贸易成功。`, 'success');
+                    } else {
+                        addLog("灵石不足。", 'error');
+                    }
+                } else if (action === 'tribute') {
+                    if (res.pills >= 10) {
+                        setRes(prev => ({...prev, pills: prev.pills - 10}));
+                        addLog(`向 ${neighbor.name} 进贡了丹药。`, 'info');
+                    } else {
+                        addLog("丹药不足。", 'error');
+                    }
+                }
+            };
+
+            const ProgressBar = ({ current, max, color = 'bg-blue-500' }) => (
+                <div className="w-full bg-slate-700 h-2 rounded-full mt-1 overflow-hidden">
+                    <div className={`h-full ${color} transition-all duration-500`} style={{ width: `${Math.min(100, (current / max) * 100)}%` }} />
+                </div>
+            );
+
+            // --- 界面渲染 ---
+            return (
+                <div className="min-h-screen bg-slate-900 text-slate-100 font-sans selection:bg-emerald-500/30 pb-10">
+                    {/* 头部 */}
+                    <header className="bg-slate-800 border-b border-slate-700 p-4 sticky top-0 z-10 shadow-lg">
+                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded bg-emerald-600 flex items-center justify-center text-xl font-bold border border-emerald-400">道</div>
+                                <div>
+                                    <h1 className="text-xl font-bold text-emerald-100">道天：宗门崛起</h1>
+                                    <p className="text-xs text-slate-400">修仙纪元：{Math.floor(Date.now() / 10000) % 10000} 年</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-4 text-sm font-medium flex-wrap justify-center">
+                                <span className="bg-slate-700 px-2 py-1 rounded border border-slate-600 text-emerald-400">境界: {currentRealm.name}</span>
+                                <span className="flex items-center gap-1 text-amber-400"><Coins /> {formatNumber(res.spiritStones)}</span>
+                                <span className="flex items-center gap-1 text-purple-400"><Activity /> 悟性: {formatNumber(res.insight)}</span>
+                                <span className="flex items-center gap-1 text-blue-400"><Users /> {pop.total} / {maxPop} 人</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-6xl mx-auto p-4 grid grid-cols-1 lg:grid-cols-4 gap-6 mt-4">
+                        {/* 侧边栏 */}
+                        <aside className="lg:col-span-1 space-y-4">
+                            <nav className="bg-slate-800 rounded-lg p-2 border border-slate-700 shadow-sm flex flex-col gap-1">
+                                {[
+                                    { id: 'sect', icon: <Mountain />, label: '宗门大殿' },
+                                    { id: 'resources', icon: <Pickaxe />, label: '资源与劳力' },
+                                    { id: 'build', icon: <Hammer />, label: '营造建设' },
+                                    { id: 'tech', icon: <Scroll />, label: '藏经阁 (科技)' },
+                                    { id: 'world', icon: <Globe />, label: '天下大势' },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all ${
+                                            activeTab === tab.id ? 'bg-emerald-900/50 text-emerald-300 border border-emerald-800' : 'hover:bg-slate-700 text-slate-300'
+                                        }`}
+                                    >
+                                        {tab.icon} {tab.label}
+                                    </button>
+                                ))}
+                            </nav>
+
+                            <div className="bg-slate-800 p-4 rounded-lg border border-emerald-900/50 shadow-inner relative overflow-hidden group">
+                                <h3 className="font-bold text-emerald-300 mb-2 flex items-center gap-2">掌门修炼</h3>
+                                {nextRealm ? (
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-xs text-slate-400">
+                                            <span>{currentRealm.name}</span>
+                                            <span>{nextRealm.name}</span>
+                                        </div>
+                                        <ProgressBar current={pop.qi} max={currentRealm.maxQi} color="bg-emerald-500" />
+                                        <div className="text-center text-xs mt-1 text-slate-400">灵气: {Math.floor(pop.qi)} / {currentRealm.maxQi}</div>
+                                        <button onClick={handleBreakthrough} className={`w-full mt-3 py-2 text-sm font-bold rounded shadow-lg transition-all border ${pop.qi >= currentRealm.maxQi ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 animate-pulse' : 'bg-slate-700 text-slate-500 border-slate-600 cursor-not-allowed'}`}>
+                                            {pop.qi >= currentRealm.maxQi ? '逆天改命 (突破)' : '积蓄灵气中...'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-amber-500 font-bold py-4">已臻化境</div>
+                                )}
+                            </div>
+                            
+                            <div className="bg-slate-800 p-3 rounded-lg border border-slate-700 h-64 overflow-y-auto text-sm space-y-2 font-mono">
+                                {logs.map(log => (
+                                    <div key={log.id} className={`pb-1 border-b border-slate-700/50 ${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-emerald-400' : log.type === 'gold' ? 'text-amber-300 font-bold' : 'text-slate-300'}`}>
+                                        <span className="opacity-50 text-xs">[{new Date(log.id).toLocaleTimeString().split(' ')[0]}]</span> {log.text}
+                                    </div>
+                                ))}
+                            </div>
+                        </aside>
+
+                        {/* 主内容区 */}
+                        <div className="lg:col-span-3 bg-slate-800/50 rounded-lg border border-slate-700 p-6 min-h-[600px]">
+                            {activeTab === 'sect' && (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold text-white">宗门概览</h2>
+                                        <button onClick={handleManualGather} className="bg-emerald-700 hover:bg-emerald-600 text-white px-6 py-2 rounded-full shadow-lg font-bold transition flex items-center gap-2 border border-emerald-500">
+                                            <Pickaxe /> 下山化缘 (手动)
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {Object.entries(RESOURCES).map(([key, info]) => (
+                                            <div key={key} className="bg-slate-800 p-4 rounded border border-slate-700 flex flex-col items-center justify-center gap-2 hover:border-emerald-500 transition">
+                                                <div className="text-emerald-400 text-xl">{info.icon}</div>
+                                                <div className="text-2xl font-mono">{formatNumber(res[key])}</div>
+                                                <div className="text-xs text-slate-400">{info.name}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                     <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+                                        <h3 className="font-bold mb-4 flex items-center gap-2"><Scroll /> 宗门箴言</h3>
+                                        <p className="text-slate-300 leading-relaxed italic border-l-4 border-emerald-500 pl-4">
+                                        "修仙之路，财侣法地。今我宗门据此灵山，当开荒种田，炼丹铸器。广积粮，高筑墙，缓称王。待到元婴大成日，方是逍遥自在时。"
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'resources' && (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center">
+                                        <h2 className="text-2xl font-bold">资源与劳力</h2>
+                                        <div className="bg-slate-700 px-4 py-2 rounded-full text-sm">
+                                            闲置弟子: <span className="text-emerald-400 font-bold text-lg">{pop.idle}</span> 人
+                                            <button onClick={handleRecruit} className="ml-4 bg-blue-600 hover:bg-blue-500 px-3 py-1 rounded text-xs text-white">招募 (+1)</button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {[
+                                            { id: 'lumberjack', name: '伐木杂役', buildReq: 'lumberYard', out: '灵木', icon: <Building2 /> },
+                                            { id: 'farmer', name: '灵植夫', buildReq: 'spiritField', out: '灵草', icon: <Leaf /> },
+                                            { id: 'miner', name: '矿工', buildReq: 'mine', out: '玄铁', icon: <Hammer /> },
+                                            { id: 'alchemist', name: '炼丹师', buildReq: 'alchemyLab', out: '聚气丹', icon: <Zap /> },
+                                            { id: 'scholar', name: '经楼学士', buildReq: 'library', out: '悟性', icon: <Scroll /> },
+                                        ].map(job => (
+                                            <div key={job.id} className={`p-4 rounded border ${buildings[job.buildReq] > 0 ? 'bg-slate-800 border-slate-600' : 'bg-slate-800/50 border-slate-800 opacity-60'}`}>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div className="flex items-center gap-2"><span className="text-emerald-400">{job.icon}</span><h3 className="font-bold">{job.name}</h3></div>
+                                                    <span className="text-xs bg-slate-900 px-2 py-1 rounded text-slate-400">产出: {job.out}</span>
+                                                </div>
+                                                {buildings[job.buildReq] > 0 ? (
+                                                    <div className="flex items-center justify-between mt-4 bg-slate-900 p-2 rounded">
+                                                        <button onClick={() => assignJob(job.id, -1)} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded text-xl">-</button>
+                                                        <span className="font-mono text-xl text-white w-12 text-center">{jobs[job.id]}</span>
+                                                        <button onClick={() => assignJob(job.id, 1)} className="w-8 h-8 bg-emerald-700 hover:bg-emerald-600 rounded text-xl">+</button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-red-400 mt-2">需先建造: {BUILDINGS.find(b=>b.id === job.buildReq)?.name}</div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'build' && (
+                                <div className="space-y-6">
+                                    <h2 className="text-2xl font-bold">宗门营造</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {BUILDINGS.map(b => (
+                                            <div key={b.id} className="bg-slate-800 p-4 rounded-lg border border-slate-600 flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex justify-between items-center mb-2">
+                                                        <h3 className="font-bold text-lg">{b.name}</h3>
+                                                        <span className="text-sm bg-slate-900 px-2 py-1 rounded text-emerald-400">拥有: {buildings[b.id]}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-400 mb-4 h-8">{b.desc}</p>
+                                                    <div className="space-y-1 mb-4">
+                                                        {Object.entries(b.cost).map(([resName, amt]) => (
+                                                            <div key={resName} className={`text-xs flex justify-between ${res[resName] >= amt ? 'text-slate-300' : 'text-red-400'}`}>
+                                                                <span>{RESOURCES[resName]?.name || resName}</span><span>{amt}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <button onClick={() => handleBuild(b.id)} className="w-full py-2 bg-slate-700 hover:bg-emerald-700 hover:text-white rounded border border-slate-600 transition-colors flex items-center justify-center gap-2">
+                                                    <Hammer /> 建造
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'tech' && (
+                                <div className="space-y-6">
+                                    <div className="flex justify-between"><h2 className="text-2xl font-bold">藏经阁</h2><div className="text-purple-400 flex items-center gap-2"><Activity /> 剩余悟性: {formatNumber(res.insight)}</div></div>
+                                    <div className="space-y-4">
+                                        {TECHS.map(tech => {
+                                            const isResearched = techs.includes(tech.id);
+                                            const canAfford = res.insight >= tech.cost;
+                                            return (
+                                                <div key={tech.id} className={`p-5 rounded-lg border flex items-center justify-between ${isResearched ? 'bg-emerald-900/20 border-emerald-800' : 'bg-slate-800 border-slate-600'}`}>
+                                                    <div>
+                                                        <h3 className={`font-bold text-lg ${isResearched ? 'text-emerald-400' : 'text-slate-200'}`}>{tech.name}</h3>
+                                                        <p className="text-sm text-slate-400">{tech.desc}</p>
+                                                    </div>
+                                                    {isResearched ? (
+                                                        <div className="px-4 py-2 bg-emerald-900/50 text-emerald-400 rounded text-sm font-bold border border-emerald-800">已研习</div>
+                                                    ) : (
+                                                        <button onClick={() => handleResearch(tech.id)} disabled={!canAfford} className={`px-6 py-2 rounded text-sm font-bold transition ${canAfford ? 'bg-purple-700 hover:bg-purple-600 text-white shadow-lg' : 'bg-slate-700 text-slate-500 cursor-not-allowed'}`}>
+                                                            研习 (-{tech.cost} 悟性)
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'world' && (
+                                <div className="space-y-6">
+                                    <h2 className="text-2xl font-bold">天下大势</h2>
+                                    {!techs.includes('sword_flying') ? (
+                                        <div className="h-64 flex flex-col items-center justify-center bg-slate-900/50 rounded border border-slate-700 border-dashed text-slate-500">
+                                            <Sword />
+                                            <p className="mt-2">宗门尚未掌握【御剑术】，无法飞出护山大阵。</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 gap-4">
+                                            {NEIGHBORS.map(n => (
+                                                <div key={n.id} className="bg-slate-800 p-5 rounded border-l-4 border-slate-600 flex flex-col md:flex-row justify-between gap-4" style={{ borderLeftColor: n.align === '正道' ? '#10b981' : n.align === '魔道' ? '#ef4444' : '#f59e0b' }}>
+                                                    <div>
+                                                        <div className="flex items-center gap-3 mb-1"><h3 className="font-bold text-lg">{n.name}</h3><span className="text-xs px-2 py-0.5 rounded bg-slate-900">{n.align}</span></div>
+                                                        <p className="text-sm text-slate-400 mb-2">{n.desc}</p>
+                                                        <div className="text-xs text-slate-500">关系: {n.attitude}</div>
+                                                    </div>
+                                                    <div className="flex gap-2 items-center">
+                                                        <button onClick={() => handleDiplomacy(n, 'trade')} className="px-4 py-2 bg-slate-700 hover:bg-blue-700 rounded text-sm transition">贸易 (-100灵石)</button>
+                                                        <button onClick={() => handleDiplomacy(n, 'tribute')} className="px-4 py-2 bg-slate-700 hover:bg-emerald-700 rounded text-sm transition">进贡 (-10丹药)</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        // 渲染到页面
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DaoistSkylines />);
+    </script>
+</body>
+</html>

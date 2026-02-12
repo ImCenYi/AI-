@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修仙宗门 - 遗迹复苏版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        /* 3D 网格效果 */
+        .sect-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.5rem;
+            perspective: 800px;
+            padding-bottom: 2rem;
+        }
+
+        .tile {
+            position: relative;
+            aspect-ratio: 1;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .tile:hover {
+            transform: translateY(-4px) scale(1.03);
+            z-index: 20;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+        }
+
+        /* 建筑容器 */
+        .building {
+            position: absolute;
+            inset: 2px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(4px);
+        }
+
+        /* 废墟样式 */
+        .ruin {
+            background-color: #1e293b;
+            border: 2px dashed #475569;
+            opacity: 0.7;
+        }
+        .ruin:hover {
+            opacity: 1;
+            border-color: #94a3b8;
+        }
+
+        /* 资源气泡动画 */
+        .resource-bubble {
+            animation: floatBubble 2.5s infinite ease-in-out;
+            cursor: pointer;
+        }
+        @keyframes floatBubble {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        /* 属性增长特效 */
+        .stat-pop {
+            animation: statPopUp 1s ease-out forwards;
+            position: absolute;
+            pointer-events: none;
+            font-weight: bold;
+            z-index: 50;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+        @keyframes statPopUp {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            100% { transform: translateY(-40px) scale(1.5); opacity: 0; }
+        }
+
+        /* 霓虹光效边框 */
+        .special-building {
+            box-shadow: 0 0 15px rgba(168, 85, 247, 0.2), inset 0 0 10px rgba(168, 85, 247, 0.1);
+            border: 1px solid rgba(168, 85, 247, 0.5);
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+<div id="app" class="h-full flex flex-col max-w-7xl mx-auto w-full p-2 gap-2">
+
+    <!-- 顶栏：基建资源 -->
+    <div class="bg-slate-800 border border-slate-700 rounded-xl p-3 shadow-lg flex flex-wrap gap-4 items-center justify-between shrink-0 z-20">
+        <div class="flex gap-6 items-center">
+            <div class="flex flex-col">
+                <span class="text-xs text-slate-400">宗门等级</span>
+                <span class="text-xl font-bold text-yellow-500 font-mono">Lv.{{ mainHallLevel }}</span>
+            </div>
+            
+            <div class="flex gap-3">
+                <div class="resource-pill bg-slate-900 border-slate-700">
+                    <i class="fas fa-gem text-blue-400"></i>
+                    <div>
+                        <div class="text-sm font-bold">{{ formatNum(res.stone) }}</div>
+                        <div class="text-[10px] text-slate-500" v-if="prod.stone > 0">+{{ formatNum(prod.stone) }}/s</div>
+                    </div>
+                </div>
+                <div class="resource-pill bg-slate-900 border-slate-700">
+                    <i class="fas fa-tree text-green-500"></i>
+                    <div>
+                        <div class="text-sm font-bold">{{ formatNum(res.wood) }}</div>
+                        <div class="text-[10px] text-slate-500" v-if="prod.wood > 0">+{{ formatNum(prod.wood) }}/s</div>
+                    </div>
+                </div>
+                <div class="resource-pill bg-slate-900 border-slate-700">
+                    <i class="fas fa-cubes text-gray-400"></i>
+                    <div>
+                        <div class="text-sm font-bold">{{ formatNum(res.iron) }}</div>
+                        <div class="text-[10px] text-slate-500" v-if="prod.iron > 0">+{{ formatNum(prod.iron) }}/s</div>
+                    </div>
+                </div>
+                <div class="resource-pill bg-slate-900 border-slate-700">
+                    <i class="fas fa-users text-orange-400"></i>
+                    <div>
+                        <div class="text-sm font-bold">{{ population }} / {{ maxPopulation }}</div>
+                        <div class="text-[10px] text-slate-500">闲: {{ idlePopulation }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button @click="collectAll" class="bg-gradient-to-b from-yellow-600 to-yellow-700 hover:from-yellow-500 hover:to-yellow-600 text-white px-6 py-2 rounded-lg shadow-lg border-b-4 border-yellow-900 active:border-b-0 active:translate-y-1 transition-all flex items-center gap-2 font-bold tracking-wider">
+            <i class="fas fa-hand-sparkles"></i> 一键征收
+        </button>
+    </div>
+
+    <!-- 主界面 -->
+    <div class="flex-1 flex gap-4 overflow-hidden relative">
+        
+        <!-- 左侧：宗门地图 -->
+        <div class="flex-1 bg-slate-900 rounded-xl border border-slate-700 p-6 overflow-y-auto relative shadow-[inset_0_0_50px_rgba(0,0,0,0.5)] custom-scroll" @click="selectedTile = null">
+            <!-- 浮动文字层 -->
+            <div class="absolute inset-0 pointer-events-none z-50 overflow-hidden">
+                <div v-for="text in floatTexts" :key="text.id" class="stat-pop" 
+                     :style="{ left: text.x + 'px', top: text.y + 'px', color: text.color }">
+                    {{ text.msg }}
+                </div>
+            </div>
+
+            <div class="sect-grid max-w-5xl mx-auto mt-8">
+                <div v-for="(tile, index) in mapTiles" :key="index" 
+                     class="tile group cursor-pointer"
+                     @click.stop="handleTileClick(index, $event)">
+                    
+                    <!-- 地块底座 -->
+                    <div class="absolute inset-0 bg-slate-800 rounded-lg border-2 border-slate-700 group-hover:border-blue-500/50 transition-colors"></div>
+
+                    <!-- 状态：已封印 (Locked) -->
+                    <div v-if="tile.locked" class="absolute inset-0 flex flex-col items-center justify-center opacity-30 group-hover:opacity-60 transition-opacity">
+                        <i class="fas fa-lock text-red-500 text-3xl mb-1"></i>
+                        <span class="text-[10px] text-gray-500">封印</span>
+                    </div>
+
+                    <!-- 状态：废墟/待修复 (Pre-assigned but level 0) -->
+                    <div v-else-if="tile.building.level === 0" class="building ruin p-2 flex flex-col items-center justify-center text-gray-500 group-hover:text-yellow-400 group-hover:border-yellow-500/50 transition-colors">
+                        <i class="fas text-3xl mb-1 opacity-50" :class="getBuildingIcon(tile.building.type)"></i>
+                        <div class="text-[10px] font-bold">待修复: {{ getBuildingName(tile.building.type) }}</div>
+                        <i class="fas fa-hammer mt-1 animate-bounce opacity-0 group-hover:opacity-100"></i>
+                    </div>
+
+                    <!-- 状态：已建成 (Active Building) -->
+                    <div v-else class="building p-2" :class="getBuildingStyle(tile.building.type)">
+                        <!-- 产出气泡 -->
+                        <div v-if="tile.building.storage > 0" 
+                             class="resource-bubble absolute -top-4 -right-4 w-10 h-10 rounded-full flex items-center justify-center border-2 border-slate-900 shadow-xl z-30 hover:scale-110 transition-transform cursor-pointer"
+                             :class="isSpecialBuilding(tile.building.type) ? 'bg-purple-600' : 'bg-yellow-500'"
+                             @click.stop="collectSingle(index, $event)">
+                            <i class="fas text-sm text-white" :class="getResourceIcon(tile.building.outputType)"></i>
+                        </div>
+
+                        <!-- 图标 -->
+                        <i class="fas text-4xl mt-1 drop-shadow-lg transition-transform group-hover:scale-110" 
+                           :class="[getBuildingIcon(tile.building.type), isSpecialBuilding(tile.building.type) ? 'text-purple-200' : 'text-white/90']"></i>
+                        
+                        <!-- 名字与等级 -->
+                        <div class="text-center z-10 w-full mt-auto mb-1">
+                            <div class="text-xs font-bold truncate px-1 rounded" :class="isSpecialBuilding(tile.building.type) ? 'bg-purple-900/50 text-purple-200' : ''">
+                                {{ getBuildingName(tile.building.type) }}
+                            </div>
+                            <div class="text-[10px] scale-90 opacity-70 font-mono">Lv.{{ tile.building.level }}</div>
+                        </div>
+
+                        <!-- 升级中 -->
+                        <div v-if="tile.building.upgrading" class="absolute inset-0 bg-black/70 rounded-lg flex flex-col items-center justify-center z-20 backdrop-blur-[2px]">
+                            <i class="fas fa-tools text-yellow-400 animate-spin-slow text-2xl mb-2"></i>
+                            <div class="text-[10px] text-yellow-200 font-bold">扩建中...</div>
+                        </div>
+
+                        <!-- 弟子点 -->
+                        <div class="absolute top-1 left-1 flex flex-col gap-0.5">
+                            <div v-for="n in tile.building.workers" :key="n" class="w-1.5 h-1.5 rounded-full bg-orange-400 shadow-[0_0_5px_orange]"></div>
+                        </div>
+                    </div>
+
+                    <!-- 选中高亮 -->
+                    <div v-if="selectedTile === index" class="absolute -inset-1 border-2 border-yellow-400/80 rounded-xl z-10 pointer-events-none animate-pulse shadow-[0_0_20px_rgba(250,204,21,0.3)]"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：功能面板 -->
+        <div class="w-80 flex flex-col gap-3 shrink-0 transition-all duration-300">
+            
+            <!-- 宗门战力加成 -->
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-purple-500/30 rounded-xl p-4 shadow-xl relative overflow-hidden group">
+                <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity text-6xl text-purple-500">
+                    <i class="fas fa-dragon"></i>
+                </div>
+                <h2 class="text-lg font-bold text-purple-300 mb-3 border-b border-purple-500/30 pb-2 flex items-center">
+                    <i class="fas fa-chart-line mr-2"></i> 宗门战力加成
+                </h2>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded border border-slate-700">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-red-900/50 flex items-center justify-center text-red-400">
+                                <i class="fas fa-sword"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-400">攻击加成</span>
+                                <span class="text-sm font-bold text-red-300">+{{ formatNum(playerStats.attack) }}</span>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-gray-500" v-if="prod.attack > 0">
+                            +{{ formatNum(prod.attack) }}/s
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded border border-slate-700">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-green-900/50 flex items-center justify-center text-green-400">
+                                <i class="fas fa-heart"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-400">生命加成</span>
+                                <span class="text-sm font-bold text-green-300">+{{ formatNum(playerStats.hp) }}</span>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-gray-500" v-if="prod.hp > 0">
+                            +{{ formatNum(prod.hp) }}/s
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center bg-slate-800/50 p-2 rounded border border-slate-700">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded bg-yellow-900/50 flex items-center justify-center text-yellow-400">
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="text-xs text-gray-400">掉落倍率</span>
+                                <span class="text-sm font-bold text-yellow-300">+{{ playerStats.dropRate.toFixed(2) }}%</span>
+                            </div>
+                        </div>
+                        <div class="text-[10px] text-gray-500" v-if="prod.dropRate > 0">
+                            +{{ prod.dropRate.toFixed(3) }}%/s
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作面板 (修复/升级) -->
+            <div class="flex-1 bg-slate-800 border border-slate-700 rounded-xl p-4 shadow-xl overflow-hidden flex flex-col">
+                <div v-if="selectedTile !== null" class="h-full flex flex-col">
+                    
+                    <!-- 1. 区域封印中 -->
+                    <div v-if="currentTileData.locked" class="text-center py-10">
+                        <i class="fas fa-lock text-4xl text-gray-600 mb-4"></i>
+                        <h3 class="text-lg font-bold text-gray-400">封印区域</h3>
+                        <p class="text-xs text-gray-500 mb-6">需消耗灵石解开封印</p>
+                        <button @click="unlockLand" class="w-full py-2 bg-blue-700 hover:bg-blue-600 text-white rounded font-bold">
+                            解封 ({{ formatNum(unlockCost) }})
+                        </button>
+                    </div>
+
+                    <!-- 2. 待修复废墟 (Ruins) -->
+                    <div v-else-if="currentBuilding.level === 0" class="h-full flex flex-col items-center justify-center text-center">
+                        <div class="w-16 h-16 bg-slate-700 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-gray-500">
+                            <i class="fas text-3xl text-gray-400" :class="getBuildingIcon(currentBuilding.type)"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-200">发现遗迹: {{ getBuildingName(currentBuilding.type) }}</h3>
+                        <p class="text-xs text-gray-500 mt-2 mb-6 max-w-[200px]">{{ getBuildingDesc(currentBuilding.type) }}</p>
+                        
+                        <button @click="repairBuilding" 
+                                class="w-full py-3 bg-green-700 hover:bg-green-600 text-white rounded font-bold shadow-lg flex flex-col items-center gap-1 group"
+                                :disabled="!canAfford(repairCost)">
+                            <span><i class="fas fa-hammer"></i> 修复建筑</span>
+                            <div class="flex gap-2 text-[10px] font-mono opacity-80 group-hover:opacity-100">
+                                <span v-if="repairCost.stone"><i class="fas fa-gem"></i> {{ formatNum(repairCost.stone) }}</span>
+                                <span v-if="repairCost.wood"><i class="fas fa-tree"></i> {{ formatNum(repairCost.wood) }}</span>
+                            </div>
+                        </button>
+                    </div>
+
+                    <!-- 3. 正常建筑管理 (Upgrade/Manage) -->
+                    <div v-else class="flex flex-col h-full">
+                        <div class="text-center mb-4 pb-4 border-b border-slate-700">
+                            <div class="w-16 h-16 mx-auto bg-slate-700 rounded-2xl flex items-center justify-center mb-2 shadow-inner border border-slate-600">
+                                <i class="fas text-3xl" :class="[getBuildingIcon(currentBuilding.type), isSpecialBuilding(currentBuilding.type) ? 'text-purple-400' : 'text-gray-300']"></i>
+                            </div>
+                            <h3 class="text-xl font-bold text-white">{{ getBuildingName(currentBuilding.type) }}</h3>
+                            <div class="text-xs text-yellow-500 font-mono">Lv.{{ currentBuilding.level }}</div>
+                        </div>
+
+                        <div class="space-y-4 mb-4 flex-1">
+                            <!-- 产出信息 -->
+                            <div v-if="currentBuilding.outputType" class="bg-slate-900/50 p-3 rounded border border-slate-700">
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-400">当前产出</span>
+                                    <span class="font-bold" :class="getOutputColor(currentBuilding.outputType)">
+                                        {{ formatNum(currentProduction) }} 
+                                        <span v-if="isAttributeOutput(currentBuilding.outputType)">/次</span>
+                                        <span v-else>/秒</span>
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-xs" v-if="currentBuilding.cap">
+                                    <span class="text-gray-400">存储容量</span>
+                                    <span class="text-gray-300">{{ formatNum(currentBuilding.storage) }} / {{ formatNum(currentCap) }}</span>
+                                </div>
+                                <div class="w-full bg-gray-700 h-1 mt-2 rounded-full overflow-hidden" v-if="currentBuilding.cap">
+                                    <div class="h-full bg-blue-500 transition-all duration-500" :style="{width: (currentBuilding.storage/currentCap*100)+'%'}"></div>
+                                </div>
+                            </div>
+
+                            <!-- 弟子管理 -->
+                            <div class="bg-slate-900/50 p-3 rounded border border-slate-700">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs text-gray-400">入驻弟子 (效率+{{currentBuilding.workers * 50}}%)</span>
+                                    <span class="text-xs font-bold text-orange-400">{{ currentBuilding.workers }}/5</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button @click="adjustWorker(-1)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-1 rounded text-xs">-</button>
+                                    <button @click="adjustWorker(1)" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-1 rounded text-xs" :disabled="idlePopulation <= 0">+</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 升级按钮 -->
+                        <div class="mt-auto">
+                            <button v-if="!currentBuilding.upgrading && !isMaxLevel" 
+                                    @click="upgradeBuilding"
+                                    class="w-full py-3 bg-blue-700 hover:bg-blue-600 text-white rounded font-bold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex flex-col items-center justify-center gap-1"
+                                    :disabled="!canAfford(upgradeCost)">
+                                <span>升级 (Lv.{{ currentBuilding.level + 1 }})</span>
+                                <div class="text-[10px] font-mono opacity-80 flex gap-2">
+                                    <span v-if="upgradeCost.stone"><i class="fas fa-gem"></i> {{ formatNum(upgradeCost.stone) }}</span>
+                                    <span v-if="upgradeCost.wood"><i class="fas fa-tree"></i> {{ formatNum(upgradeCost.wood) }}</span>
+                                    <span v-if="upgradeCost.iron"><i class="fas fa-cubes"></i> {{ formatNum(upgradeCost.iron) }}</span>
+                                </div>
+                            </button>
+                            <div v-else-if="currentBuilding.upgrading" class="w-full py-3 bg-slate-700 text-yellow-400 text-center rounded border border-dashed border-yellow-500/50 text-xs cursor-pointer" @click="finishUpgrade">
+                                <i class="fas fa-hard-hat mr-1"></i> 建设中 (点击加速)
+                            </div>
+                            <div v-else class="w-full py-3 bg-slate-800 text-gray-500 text-center rounded border border-slate-700 text-xs">
+                                已达最高等级
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-else class="h-full flex items-center justify-center text-gray-500 flex-col opacity-50">
+                    <i class="fas fa-map-marked-alt text-4xl mb-2"></i>
+                    <p class="text-xs">选择区域进行管理</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 日志 -->
+    <div class="h-24 bg-slate-900 border-t border-slate-700 p-2 overflow-y-auto text-[10px] font-mono text-gray-400 shrink-0 custom-scroll">
+        <div v-for="(log, i) in logs" :key="i" class="mb-0.5">
+            <span class="text-slate-600">[{{ log.time }}]</span> <span :class="log.color">{{ log.msg }}</span>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const { createApp, ref, computed, onMounted, reactive } = Vue;
+
+    // 建筑配置表
+    const BUILDINGS = {
+        // 基础基建
+        hall:   { name: "宗门大殿", icon: "fa-dungeon", desc: "核心建筑，提升等级上限", output: null },
+        house:  { name: "弟子精舍", icon: "fa-bed", desc: "增加弟子上限", output: "pop" },
+        farm:   { name: "百草药园", icon: "fa-seedling", desc: "产出灵石", output: "stone" },
+        forest: { name: "灵木林场", icon: "fa-tree", desc: "产出灵木", output: "wood" },
+        mine:   { name: "玄铁矿脉", icon: "fa-hammer", desc: "产出玄铁", output: "iron" },
+        
+        // 特殊属性建筑 (转化器)
+        sword:  { name: "万剑冢", icon: "fa-sword", desc: "产出剑意，提升主角攻击力", output: "attack", special: true },
+        life:   { name: "长生树", icon: "fa-leaf", desc: "产出精华，提升主角生命值", output: "hp", special: true },
+        luck:   { name: "天机阁", icon: "fa-eye", desc: "窥探天机，提升掉落倍率", output: "dropRate", special: true },
+    };
+
+    // 固定布局配置 (Fixed Layout)
+    // 0-35 索引对应的建筑类型
+    const FIXED_LAYOUT = {
+        8: 'hall', // 中心大殿 (位置8是第2行第3个)
+        
+        // 内圈：基础资源
+        7: 'farm', 9: 'forest', 2: 'house', 14: 'house',
+        
+        // 中圈：更多资源
+        1: 'farm', 3: 'forest', 6: 'farm', 10: 'forest', 13: 'farm', 15: 'forest',
+        
+        // 外圈：高级资源 & 特殊建筑
+        0: 'mine', 5: 'mine', 12: 'mine', 17: 'mine',
+        
+        // 特殊战力建筑
+        18: 'sword', 19: 'life', 20: 'luck', 
+        21: 'house', 22: 'house', 23: 'house', // 更多人口
+        
+        // 剩下的填充
+        4: 'farm', 11: 'forest', 16: 'farm', 24: 'forest', 25: 'mine',
+        26: 'sword', 27: 'life', 28: 'luck', 29: 'farm', 30: 'forest',
+        31: 'mine', 32: 'mine', 33: 'mine', 34: 'mine', 35: 'mine'
+    };
+
+    createApp({
+        setup() {
+            // 基础资源
+            const res = reactive({ stone: 1000, wood: 500, iron: 0 });
+            const population = ref(5);
+            
+            // 主角属性 (局外属性)
+            const playerStats = reactive({
+                attack: 0,
+                hp: 0,
+                dropRate: 0
+            });
+
+            // 地图数据 (6x6) - 初始化带有固定类型
+            const mapTiles = ref(Array.from({ length: 36 }, (_, i) => {
+                const type = FIXED_LAYOUT[i] || 'farm'; // 默认farm防止空
+                return {
+                    id: i,
+                    locked: i > 15, // 初始解锁前16个
+                    building: { 
+                        type: type, 
+                        level: (type === 'hall' && i === 8) ? 1 : 0, // 只有大殿初始为1级
+                        workers: 0, 
+                        storage: 0, 
+                        upgrading: false,
+                        maxStorage: 0,
+                        outputType: BUILDINGS[type].output
+                    }
+                };
+            }));
+
+            const selectedTile = ref(null);
+            const logs = ref([]);
+            const floatTexts = ref([]);
+
+            // 计算属性
+            const mainHallLevel = computed(() => {
+                const hall = mapTiles.value.find(t => t.building.type === 'hall');
+                return hall ? hall.building.level : 0;
+            });
+
+            const maxPopulation = computed(() => {
+                const houses = mapTiles.value.filter(t => t.building.type === 'house' && t.building.level > 0);
+                return 5 + houses.reduce((sum, h) => sum + (h.building.level * 5), 0);
+            });
+
+            const assignedWorkers = computed(() => mapTiles.value.reduce((sum, t) => sum + (t.building.workers || 0), 0));
+            const idlePopulation = computed(() => population.value - assignedWorkers.value);
+
+            const currentTileData = computed(() => selectedTile.value !== null ? mapTiles.value[selectedTile.value] : null);
+            const currentBuilding = computed(() => currentTileData.value?.building);
+
+            // 修复消耗 (Lv 0 -> Lv 1)
+            const repairCost = computed(() => {
+                if (!currentBuilding.value) return {};
+                const type = currentBuilding.value.type;
+                const costMap = {
+                    farm: { stone: 100, wood: 20 },
+                    forest: { stone: 50, wood: 0 },
+                    mine: { stone: 500, wood: 300 },
+                    house: { stone: 200, wood: 100 },
+                    sword: { stone: 2000, wood: 1000 },
+                    life: { stone: 2000, wood: 1000 },
+                    luck: { stone: 5000, wood: 2000 },
+                };
+                return costMap[type] || { stone: 100 };
+            });
+
+            // 升级消耗
+            const upgradeCost = computed(() => {
+                if (!currentBuilding.value) return {};
+                const lv = currentBuilding.value.level;
+                if (lv === 0) return {}; // 0级看修复消耗
+                const type = currentBuilding.value.type;
+                const factor = type === 'hall' ? 5 : (isSpecialBuilding(type) ? 3 : 1.5);
+                return {
+                    stone: Math.floor(100 * Math.pow(1.6, lv) * factor),
+                    wood: Math.floor(50 * Math.pow(1.6, lv) * factor),
+                    iron: lv > 2 ? Math.floor(10 * Math.pow(1.6, lv) * factor) : 0
+                };
+            });
+
+            // 产出预览
+            const prod = computed(() => {
+                const p = { stone: 0, wood: 0, iron: 0, attack: 0, hp: 0, dropRate: 0 };
+                mapTiles.value.forEach(t => {
+                    const b = t.building;
+                    if (b.level > 0 && !b.upgrading && b.outputType && b.outputType !== 'pop') {
+                        let base = getBaseOutput(b.type) * b.level;
+                        let workerBonus = b.workers * 0.5;
+                        p[b.outputType] += base * (1 + workerBonus);
+                    }
+                });
+                return p;
+            });
+
+            const currentProduction = computed(() => {
+                if (!currentBuilding.value || currentBuilding.value.level === 0) return 0;
+                return getBaseOutput(currentBuilding.value.type) * currentBuilding.value.level * (1 + currentBuilding.value.workers * 0.5);
+            });
+
+            const currentCap = computed(() => currentBuilding.value ? currentBuilding.value.level * (isSpecialBuilding(currentBuilding.value.type) ? 100 : 500) : 0);
+            
+            const isMaxLevel = computed(() => {
+                if (!currentBuilding.value) return false;
+                if (currentBuilding.value.level === 0) return false;
+                if (currentBuilding.value.type !== 'hall' && currentBuilding.value.level >= mainHallLevel.value) return true;
+                return currentBuilding.value.level >= 20;
+            });
+
+            const unlockCost = computed(() => {
+                const c = mapTiles.value.filter(t => !t.locked).length;
+                return Math.floor(500 * Math.pow(1.2, c - 16));
+            });
+
+            // 核心方法
+            function getBaseOutput(type) {
+                const map = { farm: 5, forest: 3, mine: 1, sword: 10, life: 100, luck: 0.01 };
+                return map[type] || 0;
+            }
+
+            function repairBuilding() {
+                if (canAfford(repairCost.value)) {
+                    pay(repairCost.value);
+                    currentBuilding.value.upgrading = true; // 借用升级状态作为修复状态
+                    addLog(`开始修复遗迹 [${getBuildingName(currentBuilding.value.type)}]`, 'text-yellow-400');
+                    setTimeout(() => {
+                        currentBuilding.value.level = 1;
+                        currentBuilding.value.upgrading = false;
+                        currentBuilding.value.maxStorage = isSpecialBuilding(currentBuilding.value.type) ? 100 : 500;
+                        addLog(`[${getBuildingName(currentBuilding.value.type)}] 修复完成！`, 'text-green-400');
+                    }, 2000);
+                }
+            }
+
+            function collectSingle(index, event) {
+                const b = mapTiles.value[index].building;
+                if (b.level > 0 && b.storage > 0) {
+                    const amount = b.storage;
+                    const type = b.outputType;
+                    
+                    if (isAttributeOutput(type)) {
+                        playerStats[type] += amount;
+                        addFloat(event.clientX, event.clientY, `+${formatNum(amount)} ${getAttributeName(type)}`, '#a855f7');
+                        addLog(`汲取 [${getBuildingName(b.type)}] 获得 ${formatNum(amount)} ${getAttributeName(type)}`, 'text-purple-400');
+                    } else if (type !== 'pop') {
+                        res[type] += amount;
+                        addFloat(event.clientX, event.clientY, `+${formatNum(amount)}`, '#fbbf24');
+                        addLog(`征收 [${getBuildingName(b.type)}] 获得 ${formatNum(amount)} ${getResourceName(type)}`);
+                    }
+                    b.storage = 0;
+                }
+            }
+
+            function collectAll() {
+                let count = 0;
+                mapTiles.value.forEach((t, idx) => {
+                    const b = t.building;
+                    if (b.level > 0 && b.storage > 0 && b.outputType !== 'pop') {
+                        if (isAttributeOutput(b.outputType)) {
+                            playerStats[b.outputType] += b.storage;
+                        } else {
+                            res[b.outputType] += b.storage;
+                        }
+                        b.storage = 0;
+                        count++;
+                    }
+                });
+                if (count > 0) addLog(`一键征收完成，宗门资源已入库`, 'text-green-400');
+            }
+
+            // 辅助逻辑
+            function isSpecialBuilding(type) { return ['sword', 'life', 'luck'].includes(type); }
+            function isAttributeOutput(type) { return ['attack', 'hp', 'dropRate'].includes(type); }
+            
+            function getAttributeName(type) {
+                return { attack: '攻击', hp: '生命', dropRate: '倍率' }[type];
+            }
+            
+            function upgradeBuilding() {
+                if (canAfford(upgradeCost.value)) {
+                    pay(upgradeCost.value);
+                    currentBuilding.value.upgrading = true;
+                    setTimeout(finishUpgrade, 3000);
+                }
+            }
+            
+            function finishUpgrade() {
+                if (currentBuilding.value) {
+                    currentBuilding.value.upgrading = false;
+                    currentBuilding.value.level++;
+                    currentBuilding.value.maxStorage = currentBuilding.value.level * (isSpecialBuilding(currentBuilding.value.type) ? 100 : 500);
+                }
+            }
+
+            function handleTileClick(index, e) { selectedTile.value = index; }
+            function unlockLand() { 
+                if(res.stone >= unlockCost.value) {
+                    res.stone -= unlockCost.value;
+                    mapTiles.value[selectedTile.value].locked = false;
+                }
+            }
+            function adjustWorker(d) {
+                if(!currentBuilding.value) return;
+                if(d>0 && idlePopulation.value>0 && currentBuilding.value.workers < 5) currentBuilding.value.workers++;
+                if(d<0 && currentBuilding.value.workers > 0) currentBuilding.value.workers--;
+            }
+            function canAfford(c) {
+                return res.stone >= (c.stone||0) && res.wood >= (c.wood||0) && res.iron >= (c.iron||0);
+            }
+            function pay(c) {
+                if(c.stone) res.stone -= c.stone;
+                if(c.wood) res.wood -= c.wood;
+                if(c.iron) res.iron -= c.iron;
+            }
+            
+            // 样式与文本
+            function getBuildingStyle(type) {
+                if(isSpecialBuilding(type)) return 'bg-slate-800 special-building text-purple-100';
+                if(type === 'hall') return 'bg-yellow-900 border-yellow-600 text-yellow-100';
+                return 'bg-slate-700 border-slate-600 text-gray-200';
+            }
+            function getBuildingIcon(type) { return BUILDINGS[type]?.icon; }
+            function getBuildingName(type) { return BUILDINGS[type]?.name; }
+            function getBuildingDesc(type) { return BUILDINGS[type]?.desc; }
+            function getResourceIcon(type) { return {stone:'fa-gem', wood:'fa-tree', iron:'fa-cubes', attack:'fa-sword', hp:'fa-heart', dropRate:'fa-star'}[type]; }
+            function getResourceName(type) { return {stone:'灵石', wood:'灵木', iron:'玄铁'}[type]; }
+            function getOutputColor(type) { return isAttributeOutput(type) ? 'text-purple-400' : 'text-green-400'; }
+            
+            function formatNum(n) {
+                if (n >= 10000) return (n/10000).toFixed(1) + '万';
+                return Math.floor(n);
+            }
+            
+            function addLog(msg, color = 'text-gray-400') {
+                logs.value.unshift({ time: new Date().toLocaleTimeString(), msg, color });
+                if(logs.value.length > 20) logs.value.pop();
+            }
+
+            function addFloat(x, y, msg, color) {
+                const id = Date.now() + Math.random();
+                floatTexts.value.push({ id, x, y, msg, color });
+                setTimeout(() => floatTexts.value = floatTexts.value.filter(t => t.id !== id), 1000);
+            }
+
+            // 循环
+            onMounted(() => {
+                setInterval(() => {
+                    // 人口
+                    if (population.value < maxPopulation.value && Math.random() < 0.1) population.value++;
+                    
+                    // 产出
+                    mapTiles.value.forEach(t => {
+                        const b = t.building;
+                        if (b.level > 0 && !b.upgrading && b.outputType) {
+                            let base = getBaseOutput(b.type) * b.level;
+                            let bonus = b.workers * 0.5;
+                            let val = base * (1 + bonus);
+                            if (b.storage < b.maxStorage) b.storage = Math.min(b.maxStorage, b.storage + val);
+                        }
+                    });
+                }, 1000);
+            });
+
+            return {
+                res, population, maxPopulation, idlePopulation, playerStats,
+                mainHallLevel, mapTiles, selectedTile, currentTileData, currentBuilding,
+                repairCost, upgradeCost, currentProduction, currentCap, isMaxLevel, unlockCost,
+                logs, floatTexts, prod,
+                handleTileClick, repairBuilding, upgradeBuilding, finishUpgrade, 
+                unlockLand, adjustWorker, collectSingle, collectAll, canAfford,
+                getBuildingStyle, getBuildingIcon, getBuildingName, getBuildingDesc, getResourceIcon, 
+                formatNum, isSpecialBuilding, isAttributeOutput, getOutputColor
+            };
+        }
+    }).mount('#app');
+</script>
+<style>
+    .resource-pill {
+        @apply flex items-center gap-2 px-3 py-1 rounded;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 4px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #475569; border-radius: 2px; }
+</style>
+</body>
+</html>
