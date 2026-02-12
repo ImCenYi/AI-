@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>指数修仙：丹药无双 (严谨权重版)</title>
+    <title>指数修仙：丹药无双 (系统整合版)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -13,12 +13,12 @@
             --accent: #4caf50;
             --danger: #f44336;
             
-            /* Quality Colors from Table */
-            --q-green: #4caf50;  /* Quality 1 */
-            --q-blue: #2196f3;   /* Quality 2 */
-            --q-purple: #9c27b0; /* Quality 3 */
-            --q-gold: #ffc107;   /* Quality 4 */
-            --q-red: #f44336;    /* Quality 5 */
+            /* Quality Colors */
+            --q-green: #4caf50;
+            --q-blue: #2196f3;
+            --q-purple: #9c27b0;
+            --q-gold: #ffc107;
+            --q-red: #f44336;
         }
 
         body {
@@ -31,7 +31,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            user-select: none; /* Prevent text selection on rapid clicking */
+            user-select: none;
         }
 
         /* Top Bar */
@@ -56,7 +56,7 @@
         /* Main Layout */
         #game-container {
             display: grid;
-            grid-template-columns: 320px 1fr 300px;
+            grid-template-columns: 320px 1fr 320px;
             flex: 1;
             gap: 10px;
             padding: 10px;
@@ -81,6 +81,37 @@
             font-weight: bold;
             color: #ccc;
             text-align: center;
+        }
+
+        /* Tabs System */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #444;
+            margin-bottom: 10px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: #2a2a2a;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            border-radius: 5px 5px 0 0;
+            transition: all 0.2s;
+        }
+        .tab-btn.active {
+            background: #444;
+            color: #fff;
+            font-weight: bold;
+            border-bottom: 2px solid var(--accent);
+        }
+        .tab-content {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+        }
+        .tab-content.active {
+            display: flex;
         }
 
         /* Left: Stats & Equip */
@@ -120,17 +151,16 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center; /* Center horizontally */
+            justify-content: center;
             position: relative;
-            padding-top: 20px; /* Add padding for top text */
+            padding-top: 20px;
         }
 
-        /* Enemy Grid System */
         .enemy-container {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); /* 5 cols for 10 enemies */
+            grid-template-columns: repeat(5, 1fr);
             gap: 10px;
-            row-gap: 40px; /* Increased gap for stats display */
+            row-gap: 40px;
             width: 90%;
             justify-items: center;
             margin-bottom: 20px;
@@ -139,7 +169,7 @@
         }
 
         .entity {
-            width: 60px; /* Smaller enemies */
+            width: 60px;
             height: 60px;
             border-radius: 50%;
             display: flex;
@@ -152,16 +182,16 @@
         }
 
         .enemy-entity { background: radial-gradient(circle, #f44336, #b71c1c); border: 2px solid #ef5350; }
-        /* Boss now overlaps or sits in grid, give it distinct style */
+        
         .boss-entity { 
             background: radial-gradient(circle, #9c27b0, #4a148c); 
             border: 3px solid #ffeb3b; 
             width: 90px; height: 90px; font-size: 2.5rem; 
             box-shadow: 0 0 30px #9c27b0; 
             z-index: 10;
-            grid-column: span 1; /* Fits in grid but bigger */
+            grid-column: span 1;
             animation: pulse 2s infinite;
-            margin-top: -15px; /* Adjust alignment */
+            margin-top: -15px;
         }
         
         @keyframes pulse {
@@ -179,10 +209,7 @@
             transition: filter 0.3s;
         }
 
-        .player-dead {
-            filter: grayscale(100%) blur(2px);
-            opacity: 0.6;
-        }
+        .player-dead { filter: grayscale(100%) blur(2px); opacity: 0.6; }
 
         .hp-bar-container {
             position: absolute;
@@ -198,7 +225,6 @@
         .enemy-hp { background: #f44336; }
         .boss-hp { background: #e040fb; }
 
-        /* Enemy Stats Display */
         .enemy-stats {
             position: absolute;
             top: -35px;
@@ -310,54 +336,57 @@
             border: 1px solid #fff;
         }
         
-        /* Right: Inventory */
-        .bag-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 5px;
-        }
-        .bag-slot {
-            aspect-ratio: 1;
-            background: #2a2a2a;
+        /* System Styles */
+        .system-section {
             border: 1px solid #444;
-            border-radius: 4px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            position: relative;
-        }
-        .bag-slot img { width: 80%; height: 80%; }
-        .bag-slot span { font-size: 1.5rem; }
-        
-        /* Tooltip */
-        #tooltip {
-            position: fixed;
-            background: rgba(0, 0, 0, 0.95);
-            border: 1px solid #666;
             padding: 10px;
             border-radius: 5px;
-            z-index: 1000;
-            pointer-events: none;
-            display: none;
-            max-width: 280px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            margin-bottom: 10px;
+            background: #252525;
+            flex: 1;
         }
-        .tip-title { font-weight: bold; color: #fff; margin-bottom: 5px; border-bottom: 1px solid #444; }
-        .tip-stat { font-size: 0.9rem; color: #aaa; display: flex; justify-content: space-between;}
-        .tip-desc { font-style: italic; font-size: 0.8rem; color: #666; margin-top: 5px; }
+        .sys-btn {
+            width: 100%;
+            padding: 12px;
+            font-size: 1rem;
+            margin: 5px 0;
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-tower { background: linear-gradient(to right, #1a237e, #3f51b5); }
+        .btn-tower.active { background: linear-gradient(to right, #b71c1c, #f44336); border-color: #ff5252; }
+        
+        .btn-cultivate { background: linear-gradient(to right, #006064, #00bcd4); }
+        .btn-cultivate-all { background: linear-gradient(to right, #004d40, #00695c); font-size: 0.9rem; }
+        
+        .res-display {
+            font-size: 1.1rem;
+            color: #00e676;
+            text-align: center;
+            margin-bottom: 10px;
+            font-family: monospace;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+        .sub-stat {
+            font-size: 0.8rem;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+            margin: 2px 0;
+        }
+        .highlight { color: #ffeb3b; }
 
         /* Quality Styles based on Table */
-        .q-1 { color: var(--q-green); border-color: var(--q-green); } /* Green */
-        .q-2 { color: var(--q-blue); border-color: var(--q-blue); }   /* Blue */
-        .q-3 { color: var(--q-purple); border-color: var(--q-purple); } /* Purple */
-        .q-4 { color: var(--q-gold); border-color: var(--q-gold); box-shadow: 0 0 5px var(--q-gold); }     /* Gold */
-        .q-5 { color: var(--q-red); border-color: var(--q-red); box-shadow: 0 0 8px var(--q-red); }      /* Red */
+        .q-1 { color: var(--q-green); border-color: var(--q-green); }
+        .q-2 { color: var(--q-blue); border-color: var(--q-blue); }
+        .q-3 { color: var(--q-purple); border-color: var(--q-purple); }
+        .q-4 { color: var(--q-gold); border-color: var(--q-gold); box-shadow: 0 0 5px var(--q-gold); }
+        .q-5 { color: var(--q-red); border-color: var(--q-red); box-shadow: 0 0 8px var(--q-red); }
 
         @media (max-width: 900px) {
             #game-container { grid-template-columns: 1fr; overflow-y: scroll; height: auto; }
             .panel { height: auto; max-height: 400px; }
-            .bag-grid { grid-template-columns: repeat(8, 1fr); }
             .combat-scene { min-height: 300px; }
             .enemy-container { grid-template-columns: repeat(5, 1fr); }
         }
@@ -366,8 +395,8 @@
 <body>
 
 <header>
-    <h1>指数修仙：丹药无双 (严谨权重版)</h1>
-    <div class="difficulty-badge" id="level-display">修炼层数: 0 (凡人)</div>
+    <h1>指数修仙：丹药无双 (系统整合版)</h1>
+    <div class="difficulty-badge" id="level-display">荒野层数: 0 (凡人)</div>
 </header>
 
 <div id="game-container">
@@ -380,14 +409,18 @@
         <div class="stat-row" style="color: gold; margin-top:5px;"><span>被动技能:</span> <span class="val">横扫千军</span></div>
         <div style="font-size:0.75rem; color:#888;">* 30%概率对所有敌人造成110%伤害</div>
         
+        <div class="panel-title" style="margin-top:15px;">法则加成</div>
+        <div class="stat-row"><span>攻击倍率:</span> <span id="mul-atk" class="val">100%</span></div>
+        <div class="stat-row"><span>生命倍率:</span> <span id="mul-hp" class="val">100%</span></div>
+        <div class="stat-row"><span>掉落加成:</span> <span id="mul-drop" class="val">0%</span></div>
+
         <div class="panel-title" style="margin-top:15px;">装备 (自动替换)</div>
         <div class="equip-grid" id="equip-grid">
             <!-- Generated by JS -->
         </div>
         <div style="margin-top: auto; font-size: 0.8rem; color: #666; text-align: center;">
-            <p>怪物强度: 2.155^层数</p>
-            <p>自动评分: 生命 + 5 * 攻击</p>
-            <p style="color:#4caf50">福利：怪物100%掉落混元丹</p>
+            <p>装备自动更替，无背包。</p>
+            <p style="color:#4caf50">荒野福利：怪物100%掉落混元丹</p>
         </div>
     </div>
 
@@ -426,30 +459,58 @@
             <button class="btn-boss" id="btn-challenge" 
                 onclick="game.manualSummonBoss()" 
                 oncontextmenu="event.preventDefault(); game.toggleAutoBoss()">
-                💀 召唤BOSS (右键自动)
+                💀 召唤荒野BOSS (右键自动)
             </button>
         </div>
         
         <div id="battle-log"></div>
     </div>
 
-    <!-- Right Panel: Inventory -->
+    <!-- Right Panel: Game Systems -->
     <div class="panel">
-        <div class="panel-title">储物袋 (手动卸下区)</div>
-        <div class="bag-grid" id="bag-grid">
-            <!-- Generated by JS -->
+        <div class="panel-title">游戏系统</div>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="game.switchTab('law')">法则修炼</button>
+            <button class="tab-btn" onclick="game.switchTab('tower')">通天塔</button>
         </div>
-        <div style="margin-top: 10px; text-align: center;">
-            <button onclick="game.clearBag()" style="background: #333; border: 1px solid #555; font-size: 0.8rem; padding: 5px;">清空储物袋</button>
+
+        <!-- Law Cultivation Tab -->
+        <div id="tab-law" class="tab-content active">
+            <div class="res-display">
+                法则真意: <span id="res-law">0</span>
+            </div>
+            <div class="system-section">
+                <div class="sub-stat">当前轮次: <span id="cult-round" class="val">0</span></div>
+                <div class="sub-stat">修炼进度: <span id="cult-step" class="val">0 / 10</span></div>
+                <div class="sub-stat">下次加成: <span id="cult-next" class="highlight">攻击 +10%</span></div>
+                <div class="sub-stat">单次消耗: <span id="cult-cost">2</span></div>
+                <div style="display:flex; gap:5px; margin-top:10px;">
+                    <button class="sys-btn btn-cultivate" onclick="game.cultivate()">✨ 感悟法则</button>
+                    <button class="sys-btn btn-cultivate-all" onclick="game.cultivateAll()">⚡ 一键感悟</button>
+                </div>
+                <div style="font-size:0.7rem; color:#888; margin-top:10px;">
+                    * 每轮10次，交替提升攻/血。<br>
+                    * 每轮提升通天塔掉率 +100%。<br>
+                    * 每轮消耗翻倍。
+                </div>
+            </div>
         </div>
-        <div style="margin-top: 10px; font-size: 0.8rem; color: #888;">
-            <p>数值更新：</p>
-            <ul style="padding-left: 20px; margin: 5px 0;">
-                <li>小怪装备掉率提升至50%</li>
-                <li>品质掉落权重: 25/25/25/15/10</li>
-                <li>玩家死亡后需等待2秒复活</li>
-                <li>BOSS击杀后难度立即+1</li>
-            </ul>
+
+        <!-- Tower Tab -->
+        <div id="tab-tower" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#3f51b5;">通天塔</div>
+                <div class="sub-stat">当前层数: <span id="tower-lv" class="val">0</span></div>
+                <div class="sub-stat">怪物强度: <span class="highlight">10^层数</span> (极难)</div>
+                <div class="sub-stat">掉落真意: <span id="tower-drop">1</span></div>
+                <button class="sys-btn btn-tower" id="btn-tower-toggle" onclick="game.toggleTowerMode()">🗼 挑战通天塔</button>
+                <div style="font-size:0.7rem; color:#888; margin-top:10px;">
+                    * 击败塔主可进入下一层。<br>
+                    * 仅掉落法则真意。<br>
+                    * 进入通天塔后可召唤塔主。
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -463,9 +524,10 @@
 
 const SCALE_ENEMY = 2.155; 
 const SCALE_EQUIP = 1.2;    
-const SCALE_PILL  = 1.3;    
+const SCALE_PILL  = 1.3;
+const SCALE_TOWER_STR = 10.0;
+const SCALE_TOWER_DROP = 2.0;
 
-// 12个部位定义 (添加 weight 权重)
 const SLOTS_CONFIG = {
     'weapon':   { name: '武器', baseAtk: 10, baseHp: 0,  hasCrit: true, weight: 10 },
     'offhand':  { name: '副武', baseAtk: 8,  baseHp: 0,  hasCrit: true, weight: 10 },
@@ -483,7 +545,6 @@ const SLOTS_CONFIG = {
 
 const SLOT_KEYS = Object.keys(SLOTS_CONFIG);
 
-// 品质定义 (使用 weight 属性控制掉率)
 const QUALITIES = {
     1: { name: '绿', color: 'var(--q-green)',  mult: 1,   crit: 1, weight: 25 },
     2: { name: '蓝', color: 'var(--q-blue)',   mult: 1.5, crit: 2, weight: 25 },
@@ -492,15 +553,16 @@ const QUALITIES = {
     5: { name: '红', color: 'var(--q-red)',    mult: 12,  crit: 5, weight: 10 }
 };
 
-const QUALITY_KEYS = [1, 2, 3, 4, 5];
-
-// 敌人定义
 const ENEMY_TYPES = [
     { name: '小怪', baseAtk: 5, baseHp: 50, isBoss: false }, 
     { name: 'BOSS', baseAtk: 30, baseHp: 1000, isBoss: true } 
 ];
 
-// 工具函数
+const TOWER_TYPES = [
+    { name: '塔灵', baseAtk: 150, baseHp: 750, isBoss: false },
+    { name: '塔主', baseAtk: 1500, baseHp: 7500, isBoss: true }
+];
+
 function formatNum(num) {
     if (num < 10000) return Math.floor(num);
     if (num < 100000000) return (num / 10000).toFixed(2) + '万';
@@ -508,21 +570,14 @@ function formatNum(num) {
     return num.toExponential(2).replace('+', '');
 }
 
-// 核心：通用权重随机函数
 function getWeightedRandom(items, weightKey = 'weight') {
     let totalWeight = 0;
-    // 计算总权重
     if (Array.isArray(items)) {
         items.forEach(i => totalWeight += i[weightKey]);
     } else {
-        for (let k in items) {
-            totalWeight += items[k][weightKey];
-        }
+        for (let k in items) totalWeight += items[k][weightKey];
     }
-
     let randomVal = Math.random() * totalWeight;
-    
-    // 寻找命中项
     if (Array.isArray(items)) {
         for (let i of items) {
             if (randomVal < i[weightKey]) return i;
@@ -531,7 +586,7 @@ function getWeightedRandom(items, weightKey = 'weight') {
         return items[items.length - 1];
     } else {
         for (let k in items) {
-            if (randomVal < items[k][weightKey]) return k; // Return Key
+            if (randomVal < items[k][weightKey]) return k;
             randomVal -= items[k][weightKey];
         }
         return Object.keys(items)[Object.keys(items).length - 1];
@@ -552,11 +607,9 @@ class Item {
             return;
         }
 
-        // 1. 独立计算部位权重
         if (typeOverride) {
             this.type = typeOverride;
         } else {
-            // 使用权重函数选择部位
             this.type = getWeightedRandom(SLOTS_CONFIG, 'weight');
         }
 
@@ -564,7 +617,6 @@ class Item {
         const variation = Math.floor(Math.random() * 5) - 2; 
         this.level = Math.max(0, baseLevel + variation);
 
-        // 2. 独立计算品质权重
         this.quality = this.rollQuality();
         const qConfig = QUALITIES[this.quality];
 
@@ -580,7 +632,6 @@ class Item {
     }
 
     rollQuality() {
-        // 使用配置表中的权重进行随机
         const key = getWeightedRandom(QUALITIES, 'weight');
         return parseInt(key);
     }
@@ -600,21 +651,22 @@ class Game {
         this.equipment = {};
         SLOT_KEYS.forEach(k => this.equipment[k] = null);
         
-        this.inventory = [];
-        this.maxInventory = 24;
-
         this.enemies = []; 
-        
-        // Auto Challenge State
         this.autoChallenge = false;
         this.lastBossDeathTime = 0;
-        
-        // Death State
         this.isDead = false;
+        
+        // Systems State
+        this.towerMode = false;
+        this.towerLevel = 0;
+        this.lawFragments = 0;
+        this.cultRound = 0;
+        this.cultStep = 0;
+        this.lawMultipliers = { atk: 1.0, hp: 1.0 };
         
         this.lastTick = Date.now();
         this.initUI();
-        this.spawnWave(); // Initial wave
+        this.spawnWave(); 
         this.loop();
     }
 
@@ -633,6 +685,7 @@ class Game {
             grid.appendChild(div);
         });
         this.updateStatsUI();
+        this.updateSystemUI();
     }
 
     getIcon(slot) {
@@ -656,19 +709,142 @@ class Game {
                 stats.crit += item.crit || 0;
             }
         }
+        
+        stats.atk *= this.lawMultipliers.atk;
+        maxHp *= this.lawMultipliers.hp;
+        
         return { ...stats, maxHp };
     }
 
-    spawnWave() {
-        // Only spawn minions to refill to 10
-        const scale = Math.pow(SCALE_ENEMY, this.difficulty);
-        const mobCount = 10;
+    switchTab(tab) {
+        const buttons = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.tab-content');
         
+        buttons.forEach(b => b.classList.remove('active'));
+        contents.forEach(c => c.classList.remove('active'));
+        
+        if (tab === 'law') {
+            buttons[0].classList.add('active');
+            document.getElementById('tab-law').classList.add('active');
+        } else {
+            buttons[1].classList.add('active');
+            document.getElementById('tab-tower').classList.add('active');
+        }
+    }
+
+    toggleTowerMode() {
+        if (this.isDead) return;
+        this.towerMode = !this.towerMode;
+        
+        const btn = document.getElementById('btn-tower-toggle');
+        const stageName = document.getElementById('stage-name');
+        
+        // Reset Auto Challenge state when switching modes
+        this.autoChallenge = false; 
+        const bossBtn = document.getElementById('btn-challenge');
+        bossBtn.classList.remove('auto-active');
+        
+        if (this.towerMode) {
+            btn.innerText = "🏃 离开通天塔";
+            btn.classList.add('active');
+            stageName.innerText = `通天塔 - 第 ${this.towerLevel} 层`;
+            bossBtn.innerText = "👺 召唤塔主 (右键自动)";
+            this.log('SYS', '进入通天塔！灵气逼人，危险！');
+        } else {
+            btn.innerText = "🗼 挑战通天塔";
+            btn.classList.remove('active');
+            this.updateLevelDisplay();
+            bossBtn.innerText = "💀 召唤荒野BOSS (右键自动)";
+            this.log('SYS', '返回荒野。');
+        }
+        
+        this.enemies = [];
+        this.spawnWave();
+    }
+
+    cultivate() {
+        const cost = 2 * Math.pow(2, this.cultRound);
+        
+        if (this.lawFragments >= cost) {
+            this.lawFragments -= cost;
+            
+            if (this.cultStep % 2 === 0) {
+                this.lawMultipliers.atk *= 1.1;
+                this.log('SYS', `法则感悟：攻击倍率提升至 ${(this.lawMultipliers.atk*100).toFixed(0)}%`);
+            } else {
+                this.lawMultipliers.hp *= 1.1;
+                this.log('SYS', `法则感悟：生命倍率提升至 ${(this.lawMultipliers.hp*100).toFixed(0)}%`);
+            }
+            
+            this.cultStep++;
+            if (this.cultStep >= 10) {
+                this.cultStep = 0;
+                this.cultRound++;
+                this.log('SYS', '法则修炼圆满一轮！真意掉落率提升！');
+            }
+            
+            this.updateStatsUI();
+            this.updateSystemUI();
+            return true;
+        } else {
+            this.log('SYS', '法则真意不足！去通天塔刷一点吧。');
+            return false;
+        }
+    }
+
+    cultivateAll() {
+        let count = 0;
+        while(true) {
+            // Check cost first to prevent log spam from failure
+            const cost = 2 * Math.pow(2, this.cultRound);
+            if (this.lawFragments < cost) break;
+            
+            this.lawFragments -= cost;
+            if (this.cultStep % 2 === 0) this.lawMultipliers.atk *= 1.1;
+            else this.lawMultipliers.hp *= 1.1;
+            
+            this.cultStep++;
+            if (this.cultStep >= 10) {
+                this.cultStep = 0;
+                this.cultRound++;
+            }
+            count++;
+        }
+        
+        if (count > 0) {
+            this.log('SYS', `一键感悟：进行了 ${count} 次修炼。`);
+            this.updateStatsUI();
+            this.updateSystemUI();
+        } else {
+            this.log('SYS', '法则真意不足！');
+        }
+    }
+
+    spawnWave() {
+        let mobCount = 10;
         let currentMobCount = this.enemies.filter(e => !e.isBoss).length;
         
-        if (currentMobCount < mobCount) {
+        if (currentMobCount >= mobCount) return;
+
+        if (this.towerMode) {
+            const scale = Math.pow(SCALE_TOWER_STR, this.towerLevel);
             for (let i = 0; i < (mobCount - currentMobCount); i++) {
-                const template = ENEMY_TYPES[0]; // 小怪
+                const template = TOWER_TYPES[0]; 
+                this.enemies.push({
+                    id: `tower-mob-${Date.now()}-${i}`,
+                    name: `${template.name}`,
+                    maxHp: template.baseHp * scale,
+                    currentHp: template.baseHp * scale,
+                    atk: template.baseAtk * scale,
+                    isBoss: false,
+                    isTower: true,
+                    emoji: '🗿'
+                });
+            }
+        } else {
+            const scale = Math.pow(SCALE_ENEMY, this.difficulty);
+            for (let i = 0; i < (mobCount - currentMobCount); i++) {
+                const template = ENEMY_TYPES[0];
                 this.enemies.push({
                     id: `mob-${Date.now()}-${i}`,
                     name: `${template.name}`,
@@ -676,6 +852,7 @@ class Game {
                     currentHp: template.baseHp * scale,
                     atk: template.baseAtk * scale,
                     isBoss: false,
+                    isTower: false,
                     emoji: ['🦇', '🐺', '🕷️', '🦂', '🐍'][Math.floor(Math.random()*5)]
                 });
             }
@@ -684,28 +861,42 @@ class Game {
     }
     
     manualSummonBoss() {
-        if (this.isBossAlive()) {
-            this.log('SYS', 'BOSS已在场！');
-            return;
-        }
+        if (this.isBossAlive()) return;
         this.summonBoss();
     }
 
     summonBoss() {
         if (this.isBossAlive()) return;
         
-        const template = ENEMY_TYPES[1]; // BOSS
-        const scale = Math.pow(SCALE_ENEMY, this.difficulty);
-        const boss = {
-            id: 'boss-' + Date.now(),
-            name: `${template.name} (Lv.${this.difficulty})`,
-            maxHp: template.baseHp * scale,
-            currentHp: template.baseHp * scale,
-            atk: template.baseAtk * scale,
-            isBoss: true
-        };
-        this.enemies.push(boss);
-        this.log('SYS', `👹 BOSS [${boss.name}] 降临！混战开始！`);
+        if (this.towerMode) {
+            const template = TOWER_TYPES[1]; // Tower Boss
+            const scale = Math.pow(SCALE_TOWER_STR, this.towerLevel);
+            const boss = {
+                id: 'tower-boss-' + Date.now(),
+                name: `${template.name} (Lv.${this.towerLevel})`,
+                maxHp: template.baseHp * scale,
+                currentHp: template.baseHp * scale,
+                atk: template.baseAtk * scale,
+                isBoss: true,
+                isTower: true
+            };
+            this.enemies.push(boss);
+            this.log('SYS', `👺 塔主 [${boss.name}] 现身！`);
+        } else {
+            const template = ENEMY_TYPES[1]; // Wild BOSS
+            const scale = Math.pow(SCALE_ENEMY, this.difficulty);
+            const boss = {
+                id: 'boss-' + Date.now(),
+                name: `${template.name} (Lv.${this.difficulty})`,
+                maxHp: template.baseHp * scale,
+                currentHp: template.baseHp * scale,
+                atk: template.baseAtk * scale,
+                isBoss: true,
+                isTower: false
+            };
+            this.enemies.push(boss);
+            this.log('SYS', `👹 BOSS [${boss.name}] 降临！`);
+        }
         this.updateCombatUI(true);
     }
 
@@ -715,11 +906,9 @@ class Game {
         if (this.autoChallenge) {
             btn.classList.add('auto-active');
             btn.innerText = "自动挑战中 (右键关闭)";
-            this.log('SYS', '开启自动挑战BOSS模式');
         } else {
             btn.classList.remove('auto-active');
-            btn.innerText = "💀 召唤BOSS (右键自动)";
-            this.log('SYS', '关闭自动挑战BOSS模式');
+            btn.innerText = this.towerMode ? "👺 召唤塔主 (右键自动)" : "💀 召唤荒野BOSS (右键自动)";
         }
     }
 
@@ -731,18 +920,16 @@ class Game {
         const now = Date.now();
         if (now - this.lastTick >= 1000) {
             this.combatTurn();
-            // Check Auto Boss
+            // Auto Boss Logic (Works for both Tower and Wild now)
             if (this.autoChallenge && !this.isDead) {
                 if (!this.isBossAlive() && (now - this.lastBossDeathTime > 5000)) {
                     this.summonBoss();
                 }
             }
-            
             this.lastTick = now;
         }
         
         const stats = this.getTotalStats();
-        // Heal if not dead and not full
         if (!this.isDead && this.currentHp < stats.maxHp && this.currentHp > 0) {
             this.currentHp = Math.min(stats.maxHp, this.currentHp + stats.maxHp * 0.05);
             this.updateCombatUI();
@@ -754,10 +941,8 @@ class Game {
     combatTurn() {
         if (this.isDead) return;
 
-        // Clean up dead
         this.enemies = this.enemies.filter(e => e.currentHp > 0);
-
-        // Respawn minions if needed
+        
         if (this.enemies.filter(e => !e.isBoss).length < 5) {
             this.spawnWave();
         }
@@ -769,54 +954,50 @@ class Game {
 
         const pStats = this.getTotalStats();
 
-        // --- Player Turn ---
+        // Player Turn
         const isSkill = Math.random() < 0.3;
         
         if (isSkill) {
             this.log('SYS', `<span class="log-skill">触发技能：横扫千军！</span>`);
             this.showSkillEffect("横扫千军!");
-            
             this.enemies.forEach(enemy => {
                 let dmg = pStats.atk * 1.1; 
                 let isCrit = Math.random() * 100 < pStats.crit;
                 if (isCrit) dmg *= 2.0;
-                
                 enemy.currentHp -= dmg;
                 this.showDamage(dmg, enemy.id, isCrit);
             });
         } else {
-            // Priority: Hit Boss if exists, else first enemy
             const target = this.enemies.find(e => e.isBoss) || this.enemies[0];
             if (target) {
                 let dmg = pStats.atk;
                 let isCrit = Math.random() * 100 < pStats.crit;
                 if (isCrit) dmg *= 2.0;
                 dmg *= (0.9 + Math.random() * 0.2);
-                
                 target.currentHp -= dmg;
                 this.showDamage(dmg, target.id, isCrit);
             }
         }
 
-        // Check kills immediately
+        // Process Deaths
         const deadEnemies = this.enemies.filter(e => e.currentHp <= 0);
         deadEnemies.forEach(e => {
             if (e.isBoss) {
                 this.handleBossKill(e);
             } else {
-                this.rollLoot(false);
+                if (e.isTower) this.rollTowerLoot();
+                else this.rollWildLoot(false);
             }
         });
         
-        // Remove dead again
         this.enemies = this.enemies.filter(e => e.currentHp > 0);
 
         if (this.enemies.length === 0) {
-            this.spawnWave(); 
+            this.spawnWave();
             return;
         }
 
-        // --- Enemy Turn ---
+        // Enemy Turn
         let totalIncomingDmg = 0;
         this.enemies.forEach(enemy => {
             let eDmg = enemy.atk * (0.8 + Math.random() * 0.4);
@@ -836,66 +1017,71 @@ class Game {
     }
 
     handleBossKill(boss) {
-        this.log('GAIN', `击杀 BOSS [${boss.name}]!`);
-        this.difficulty++;
+        this.log('GAIN', `击杀 [${boss.name}]!`);
         this.lastBossDeathTime = Date.now();
-        this.log('SYS', `★ 难度提升！当前层数: ${this.difficulty}`);
-        this.updateLevelDisplay();
-        this.rollLoot(true); // Boss loot
         
-        // Heal Player on Boss Kill
+        if (this.towerMode) {
+            this.towerLevel++;
+            this.log('SYS', `★ 突破通天塔！当前层数: ${this.towerLevel}`);
+            // Tower Boss drops extra fragments? Or just normal loot?
+            // "Base 1... * (1+Round)". Boss might act as a gatekeeper.
+            // Let's give huge fragments for Boss.
+            const drop = 10 * Math.pow(SCALE_TOWER_DROP, this.towerLevel) * (1 + this.cultRound);
+            this.lawFragments += drop;
+            this.log('GAIN', `塔主掉落海量真意: ${formatNum(drop)}`);
+            this.updateSystemUI();
+            this.updateLevelDisplay();
+        } else {
+            this.difficulty++;
+            this.log('SYS', `★ 荒野层数提升: ${this.difficulty}`);
+            this.updateLevelDisplay();
+            this.rollWildLoot(true); 
+        }
+        
         const stats = this.getTotalStats();
         this.currentHp = Math.min(stats.maxHp, this.currentHp + stats.maxHp * 0.5);
     }
 
     handleLoss() {
         if (this.isDead) return;
-        
         this.isDead = true;
         this.currentHp = 0;
-        this.log('DMG', `你已死亡！等待复活...`);
-        
-        // Show death UI
+        this.log('DMG', `你已死亡！2秒后复活。`);
         document.getElementById('resurrect-overlay').style.display = 'flex';
         document.getElementById('player-entity').classList.add('player-dead');
-        this.updateCombatUI();
-
-        // If boss is alive, it leaves to prevent death loops
+        
         if (this.isBossAlive()) {
-            this.log('SYS', `BOSS太强了，它离开了战场。`);
             this.enemies = this.enemies.filter(e => !e.isBoss);
             this.lastBossDeathTime = Date.now(); 
         }
-
-        // Resurrect after 2 seconds
-        setTimeout(() => {
-            this.revive();
-        }, 2000);
+        
+        setTimeout(() => this.revive(), 2000);
     }
 
     revive() {
         this.isDead = false;
         const stats = this.getTotalStats();
         this.currentHp = stats.maxHp;
-        
         document.getElementById('resurrect-overlay').style.display = 'none';
         document.getElementById('player-entity').classList.remove('player-dead');
-        
-        this.log('SYS', `满血复活！再战三百回合！`);
         this.updateCombatUI();
-        
-        // Ensure mobs are present
         if (this.enemies.length < 5) this.spawnWave();
     }
 
     // --- Loot ---
 
-    rollLoot(isBoss) {
-        // 100% 概率掉落混元丹
+    rollTowerLoot() {
+        const bonusMult = 1 + this.cultRound;
+        const dropAmount = 1 * Math.pow(SCALE_TOWER_DROP, this.towerLevel) * bonusMult;
+        this.lawFragments += dropAmount;
+        this.log('GAIN', `获得法则真意: ${formatNum(dropAmount)}`);
+        this.updateSystemUI();
+    }
+
+    rollWildLoot(isBoss) {
         const pill = new Item(this.difficulty, 'pill');
         this.autoConsumePill(pill);
 
-        // Chance to get equip
         const dropChance = isBoss ? 100 : 50; 
         if (Math.random() * 100 < dropChance) {
             const equip = new Item(this.difficulty);
@@ -916,75 +1102,19 @@ class Game {
 
         if (newScore > currentScore) {
             this.equipment[slot] = newItem;
-            this.log('GAIN', `自动换装: <span style="color:${QUALITIES[newItem.quality].color}">${newItem.name}</span>`);
+            this.log('GAIN', `换装: <span style="color:${QUALITIES[newItem.quality].color}">${newItem.name}</span>`);
             this.renderEquip();
             this.updateStatsUI();
         } else {
-            this.playerBase.hp += 1; // Decompose
-            if (newItem.quality >= 4) {
-                this.log('SYS', `分解: ${newItem.name}`);
-            }
-            this.updateStatsUI();
+            this.playerBase.hp += 1; 
         }
     }
 
     autoConsumePill(pill) {
         this.playerBase.hp += pill.hpValue;
         this.playerBase.atk += pill.atkValue;
-        this.log('GAIN', `吞噬: ${pill.name} (血+${formatNum(pill.hpValue)} / 攻+${formatNum(pill.atkValue)})`);
+        this.log('GAIN', `吞噬: ${pill.name} (血+${formatNum(pill.hpValue)}/攻+${formatNum(pill.atkValue)})`);
         this.updateStatsUI();
-    }
-
-    // --- Inventory UI (Manual) ---
-    renderInventory() {
-        const grid = document.getElementById('bag-grid');
-        grid.innerHTML = '';
-        this.inventory.forEach((item, idx) => {
-            const div = document.createElement('div');
-            const qClass = item.type === 'pill' ? 'q-3' : `q-${item.quality}`;
-            div.className = `bag-slot ${qClass}`;
-            div.innerHTML = `<span>${item.type === 'pill' ? '💊' : this.getIcon(item.type)}</span>`;
-            div.onclick = () => this.useItem(idx); 
-            div.onmouseenter = (e) => this.showTooltip(e, item);
-            div.onmouseleave = () => this.hideTooltip();
-            grid.appendChild(div);
-        });
-    }
-
-    useItem(idx) {
-        const item = this.inventory[idx];
-        if (item.type === 'pill') {
-            this.autoConsumePill(item);
-        } else {
-            const currentItem = this.equipment[item.type];
-            this.equipment[item.type] = item;
-            if (currentItem) this.inventory.push(currentItem);
-        }
-        this.inventory.splice(idx, 1);
-        this.renderInventory();
-        this.renderEquip();
-        this.updateStatsUI();
-        this.hideTooltip();
-    }
-
-    unequip(slot) {
-        if (!this.equipment[slot]) return;
-        if (this.inventory.length >= this.maxInventory) {
-            this.log('SYS', '背包满');
-            return;
-        }
-        this.inventory.push(this.equipment[slot]);
-        this.equipment[slot] = null;
-        this.renderEquip();
-        this.renderInventory();
-        this.updateStatsUI();
-    }
-    
-    clearBag() {
-        if(this.inventory.length === 0) return;
-        this.inventory = [];
-        this.log('SYS', '清空背包');
-        this.renderInventory();
     }
 
     renderEquip() {
@@ -1012,6 +1142,26 @@ class Game {
         document.getElementById('stat-hp').innerText = `${formatNum(this.currentHp)} / ${formatNum(s.maxHp)}`;
         document.getElementById('stat-atk').innerText = formatNum(s.atk);
         document.getElementById('stat-crit').innerText = s.crit + '%';
+        
+        document.getElementById('mul-atk').innerText = (this.lawMultipliers.atk * 100).toFixed(0) + '%';
+        document.getElementById('mul-hp').innerText = (this.lawMultipliers.hp * 100).toFixed(0) + '%';
+        document.getElementById('mul-drop').innerText = "+" + (this.cultRound * 100) + '%';
+    }
+    
+    updateSystemUI() {
+        document.getElementById('res-law').innerText = formatNum(this.lawFragments);
+        document.getElementById('cult-round').innerText = this.cultRound;
+        document.getElementById('cult-step').innerText = `${this.cultStep} / 10`;
+        
+        const cost = 2 * Math.pow(2, this.cultRound);
+        document.getElementById('cult-cost').innerText = formatNum(cost);
+        
+        const nextType = (this.cultStep % 2 === 0) ? "攻击" : "生命";
+        document.getElementById('cult-next').innerText = `${nextType} x1.1`;
+        
+        document.getElementById('tower-lv').innerText = this.towerLevel;
+        const drop = 1 * Math.pow(SCALE_TOWER_DROP, this.towerLevel) * (1 + this.cultRound);
+        document.getElementById('tower-drop').innerText = formatNum(drop);
     }
 
     updateCombatUI(forceRedraw = false) {
@@ -1022,12 +1172,12 @@ class Game {
 
         if (forceRedraw || container.children.length !== this.enemies.length) {
             container.innerHTML = '';
-            // Sort enemies so Boss is last (on top in grid or DOM order)
-            // But for grid layout, order matters for position. Let's just append.
             this.enemies.forEach((enemy) => {
                 const el = document.createElement('div');
                 el.id = `enemy-el-${enemy.id}`; 
                 el.className = enemy.isBoss ? 'entity boss-entity' : 'entity enemy-entity';
+                if(enemy.isTower) el.style.border = '2px solid #3f51b5'; 
+                
                 el.innerHTML = `
                     <div class="enemy-stats">
                         ⚔️${formatNum(enemy.atk)}<br>
@@ -1039,14 +1189,12 @@ class Game {
                 container.appendChild(el);
             });
         } else {
-            // Update bars and stats text
             this.enemies.forEach((enemy) => {
                 const el = document.getElementById(`enemy-el-${enemy.id}`);
                 if (el) {
                     const bar = el.querySelector('.hp-bar-fill');
                     const stats = el.querySelector('.enemy-stats');
                     const pct = (enemy.currentHp / enemy.maxHp) * 100;
-                    
                     bar.style.width = Math.max(0, pct) + '%';
                     stats.innerHTML = `⚔️${formatNum(enemy.atk)}<br>❤️${formatNum(enemy.currentHp)}`;
                 }
@@ -1055,8 +1203,13 @@ class Game {
     }
 
     updateLevelDisplay() {
-        document.getElementById('level-display').innerText = `修炼层数: ${this.difficulty}`;
-        document.getElementById('stage-name').innerText = `荒野 - 第 ${this.difficulty} 层`;
+        if(this.towerMode) {
+            document.getElementById('level-display').innerText = `通天塔层数: ${this.towerLevel}`;
+            document.getElementById('stage-name').innerText = `通天塔 - 第 ${this.towerLevel} 层`;
+        } else {
+            document.getElementById('level-display').innerText = `荒野层数: ${this.difficulty}`;
+            document.getElementById('stage-name').innerText = `荒野 - 第 ${this.difficulty} 层`;
+        }
     }
 
     log(type, msg) {
@@ -1093,7 +1246,6 @@ class Game {
                 el.style.top = '30%';
             }
         }
-        
         overlay.appendChild(el);
         setTimeout(() => el.remove(), 800);
     }
@@ -1114,29 +1266,18 @@ class Game {
         tt.style.top = e.clientY + 10 + 'px';
 
         let html = '';
-        if (item.type === 'pill') {
-             html = `
-                <div class="tip-title" style="color:var(--q-purple)">${item.name}</div>
-                <div class="tip-stat"><span>类型</span> <span>混元丹</span></div>
-                <div class="tip-stat" style="color:#69f0ae"><span>效果</span> <span>永久提升生命与攻击</span></div>
-                <div class="tip-stat"><span>生命</span> <span>+${formatNum(item.hpValue)}</span></div>
-                <div class="tip-stat"><span>攻击</span> <span>+${formatNum(item.atkValue)}</span></div>
-                <div class="tip-desc">对应层数: ${item.level}</div>
-             `;
-        } else {
-            const q = QUALITIES[item.quality];
-            const score = this.getItemScore(item);
-            html = `
-                <div class="tip-title" style="color:${q.color}">${item.name}</div>
-                <div class="tip-stat"><span>部位</span> <span>${SLOTS_CONFIG[item.type].name}</span></div>
-                <div class="tip-stat"><span>品质</span> <span style="color:${q.color}">${q.name}</span></div>
-                <div class="tip-stat" style="color:#aaa; border-bottom:1px solid #444; margin-bottom:5px;"><span>装备评分</span> <span>${formatNum(score)}</span></div>
-                ${item.atk > 0 ? `<div class="tip-stat"><span>攻击力</span> <span>+${formatNum(item.atk)}</span></div>` : ''}
-                ${item.hp > 0 ? `<div class="tip-stat"><span>生命值</span> <span>+${formatNum(item.hp)}</span></div>` : ''}
-                ${item.crit > 0 ? `<div class="tip-stat" style="color:#ffd740"><span>暴击率</span> <span>+${item.crit}%</span></div>` : ''}
-                <div class="tip-desc">物品等级: ${item.level}</div>
-            `;
-        }
+        const q = QUALITIES[item.quality];
+        const score = this.getItemScore(item);
+        html = `
+            <div class="tip-title" style="color:${q.color}">${item.name}</div>
+            <div class="tip-stat"><span>部位</span> <span>${SLOTS_CONFIG[item.type].name}</span></div>
+            <div class="tip-stat"><span>品质</span> <span style="color:${q.color}">${q.name}</span></div>
+            <div class="tip-stat" style="color:#aaa; border-bottom:1px solid #444; margin-bottom:5px;"><span>装备评分</span> <span>${formatNum(score)}</span></div>
+            ${item.atk > 0 ? `<div class="tip-stat"><span>攻击力</span> <span>+${formatNum(item.atk)}</span></div>` : ''}
+            ${item.hp > 0 ? `<div class="tip-stat"><span>生命值</span> <span>+${formatNum(item.hp)}</span></div>` : ''}
+            ${item.crit > 0 ? `<div class="tip-stat" style="color:#ffd740"><span>暴击率</span> <span>+${item.crit}%</span></div>` : ''}
+            <div class="tip-desc">物品等级: ${item.level}</div>
+        `;
         tt.innerHTML = html;
     }
 
