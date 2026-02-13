@@ -21,11 +21,11 @@
             --q-red: #f44336;
             
             /* Treasure Ranks */
-            --t-n: #b0b0b0;
-            --t-r: #4caf50;
-            --t-sr: #03a9f4;
-            --t-ssr: #ffc107;
-            --t-ur: #ff3d00;
+            --t-n: #4caf50;   /* Green */
+            --t-r: #2196f3;   /* Blue */
+            --t-sr: #9c27b0;  /* Purple */
+            --t-ssr: #ffc107; /* Gold */
+            --t-ur: #f44336;  /* Red */
         }
 
         body {
@@ -52,12 +52,37 @@
         }
 
         h1 { margin: 0; font-size: 1.2rem; color: #ffd700; }
+        
+        .header-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
         .difficulty-badge {
             background: #333;
             padding: 5px 15px;
             border-radius: 20px;
             border: 1px solid #555;
             font-weight: bold;
+        }
+        
+        .cheat-btn {
+            background: linear-gradient(45deg, #d50000, #ff1744);
+            border: 1px solid #ff5252;
+            color: white;
+            font-weight: bold;
+            padding: 5px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #d50000;
+            animation: pulse-red 2s infinite;
+        }
+        
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 5px #d50000; }
+            50% { box-shadow: 0 0 15px #ff1744; }
+            100% { box-shadow: 0 0 5px #d50000; }
         }
 
         /* Main Layout */
@@ -411,13 +436,13 @@
 
         .treasure-bag-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 4px;
             margin-top: 10px;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
             border: 1px solid #333;
-            padding: 4px;
+            padding: 5px;
             background: #111;
         }
         
@@ -428,8 +453,8 @@
             font-size: 0.8rem;
         }
 
-        /* Modal */
-        #item-modal {
+        /* Modal Base */
+        .game-modal {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.8);
@@ -445,6 +470,7 @@
             border-radius: 8px;
             width: 300px;
             text-align: center;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
         }
         .modal-btn {
             padding: 8px 15px;
@@ -458,12 +484,96 @@
         .btn-close { background: #666; }
         .btn-lock { background: #ff9800; }
         .btn-split { background: #f44336; }
+        
+        /* Full Screen Treasure Modal */
+        #treasure-full-modal .modal-content {
+            width: 80%;
+            height: 80%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            position: relative;
+        }
+
+        .treasure-layout {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+            gap: 15px;
+            height: 100%;
+            margin-top: 15px;
+            text-align: left;
+        }
+
+        .treasure-left-panel {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .treasure-right-panel {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Treasure Item Display */
+        .t-item-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            width: 100%;
+        }
+        .t-lvl {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            font-size: 0.65rem;
+            color: #fff;
+            background: rgba(0,0,0,0.5);
+            padding: 0 2px;
+            border-radius: 2px;
+        }
+        .t-attr {
+            font-size: 0.65rem;
+            color: #ddd;
+            margin-top: 2px;
+            text-align: center;
+            line-height: 1;
+        }
+
+        /* Cheat Modal Inputs */
+        .cheat-input {
+            width: 90%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
+        .cheat-select {
+            width: 95%;
+            padding: 8px;
+            margin: 10px 0;
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
 
         @media (max-width: 900px) {
             #game-container { grid-template-columns: 1fr; overflow-y: scroll; height: auto; }
             .panel { height: auto; max-height: 400px; }
             .combat-scene { min-height: 300px; }
             .enemy-container { grid-template-columns: repeat(5, 1fr); }
+            .treasure-layout { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -471,7 +581,10 @@
 
 <header>
     <h1>指数修仙：丹药无双 (副本秘宝版)</h1>
-    <div class="difficulty-badge" id="level-display">荒野层数: 0 (凡人)</div>
+    <div class="header-controls">
+        <div class="difficulty-badge" id="level-display">荒野层数: 0 (凡人)</div>
+        <button class="cheat-btn" onclick="game.toggleCheatModal()">🔥 金手指</button>
+    </div>
 </header>
 
 <div id="game-container">
@@ -589,34 +702,18 @@
             </div>
         </div>
 
-        <!-- Treasure Tab -->
+        <!-- Treasure Tab (Summary) -->
         <div id="tab-treasure" class="tab-content">
-            <div class="system-section" style="padding-bottom: 50px;">
+            <div class="system-section">
                 <div class="res-display" style="border:none; color:#7b1fa2;">秘宝阁</div>
-                <div class="sub-stat">开启次数: <span id="treasure-daily">20 / 20</span></div>
+                <div class="sub-stat">待开宝箱: <span id="chest-count" class="highlight">0</span></div>
+                <div class="sub-stat">剩余次数: <span id="treasure-daily">20 / 20</span></div>
                 <div class="sub-stat">秘宝碎片: <span id="treasure-frags">0</span></div>
-                
-                <div style="display:flex; gap:5px; margin-top:5px;">
-                    <button class="sys-btn btn-treasure" onclick="game.openTreasureBox(1)">🎁 开启 (1次)</button>
-                    <button class="sys-btn btn-treasure" onclick="game.exchangeTreasure()">♻️ 碎片兑换</button>
-                </div>
-                
-                <div style="border-top:1px solid #444; margin-top:5px; padding-top:5px;">
-                    <input type="text" id="redeem-code" placeholder="输入兑换码" style="width:50%; padding:5px; background:#111; border:1px solid #444; color:#fff;">
-                    <button onclick="game.redeemCode()" style="padding:5px; width:40%;">+10次</button>
-                </div>
-
-                <div style="font-weight:bold; margin-top:10px; border-bottom:1px solid #444;">已装备</div>
-                <div class="equip-grid" id="treasure-equip-grid" style="grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                    <!-- Equip Slots -->
-                </div>
-
-                <div style="font-weight:bold; margin-top:10px; display:flex; justify-content:space-between;">
-                    <span>秘宝背包</span>
-                    <button onclick="game.autoDecompose()" style="font-size:0.7rem; padding:2px 5px; background:#f44336;">一键分解</button>
-                </div>
-                <div class="treasure-bag-grid" id="treasure-bag">
-                    <!-- Bag Slots -->
+                <button class="sys-btn btn-treasure" onclick="game.openTreasureModal()">🚪 进入秘宝阁</button>
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 通关副本获得宝箱。<br>
+                    * 每日20次开启限制。<br>
+                    * 提供强力指数级词条。
                 </div>
             </div>
         </div>
@@ -626,18 +723,189 @@
 <div id="tooltip"></div>
 
 <!-- Item Modal -->
-<div id="item-modal">
+<div id="item-modal" class="game-modal" style="z-index: 2000;">
     <div class="modal-content">
         <h3 id="modal-title" style="margin-top:0;">Item Name</h3>
         <p id="modal-desc" style="color:#aaa; font-size:0.9rem;">Stats</p>
         <div id="modal-actions">
             <!-- Buttons injected by JS -->
         </div>
-        <button class="modal-btn btn-close" onclick="game.closeModal()">关闭</button>
+        <button class="modal-btn btn-close" onclick="game.closeModal('item-modal')">关闭</button>
+    </div>
+</div>
+
+<!-- Treasure Full Screen Modal -->
+<div id="treasure-full-modal" class="game-modal">
+    <div class="modal-content">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px;">
+            <h2 style="margin:0; color:#7b1fa2;">秘宝阁</h2>
+            <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeModal('treasure-full-modal')">✕</button>
+        </div>
+        
+        <div class="treasure-layout">
+            <!-- Left: Equipped -->
+            <div class="treasure-left-panel">
+                <div style="font-weight:bold; margin-bottom:10px; color:#aaa;">已装备秘宝 (右键卸下)</div>
+                <div class="equip-grid" id="treasure-equip-grid" style="grid-template-columns: repeat(2, 1fr); gap: 8px;">
+                    <!-- Slots -->
+                </div>
+                
+                <div style="margin-top:auto; font-size:0.8rem; color:#888;">
+                    <div class="sub-stat">待开宝箱: <span id="modal-chest-count" class="highlight">0</span></div>
+                    <div class="sub-stat">剩余次数: <span id="modal-daily-count">20</span></div>
+                    <div class="sub-stat">秘宝碎片: <span id="modal-frag-count">0</span></div>
+                </div>
+            </div>
+
+            <!-- Right: Bag & Controls -->
+            <div class="treasure-right-panel">
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <button class="sys-btn btn-treasure" style="flex:1; margin:0;" onclick="game.openTreasureBox(1)">🎁 开启宝箱 (消耗1次)</button>
+                    <button class="sys-btn btn-treasure" style="flex:1; margin:0;" onclick="game.exchangeTreasure()">♻️ 碎片兑换</button>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                    <span style="font-weight:bold; color:#aaa;">秘宝背包 (右键穿戴/替换)</span>
+                    <button onclick="game.autoDecompose()" style="font-size:0.8rem; padding:4px 8px; background:#f44336; border:none; color:white; cursor:pointer;">一键分解</button>
+                </div>
+                
+                <div class="treasure-bag-grid" id="treasure-bag">
+                    <!-- Bag Items -->
+                </div>
+
+                <div style="margin-top:10px; border-top:1px solid #444; padding-top:10px; display:flex; gap:5px;">
+                    <input type="text" id="redeem-code-modal" placeholder="输入兑换码" style="flex:1; padding:5px; background:#111; border:1px solid #444; color:#fff;">
+                    <button onclick="game.redeemCode('modal')" style="padding:5px 15px;">兑换</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cheat Modal -->
+<div id="cheat-modal" class="game-modal">
+    <div class="modal-content">
+        <h3 style="margin-top:0; color:#ff1744;">🔥 金手指修改器</h3>
+        <select id="cheat-type" class="cheat-select">
+            <option value="atk">增加基础攻击力</option>
+            <option value="hp">增加基础生命值</option>
+            <option value="curHp">恢复当前生命值</option>
+            <option value="law">增加法则真意</option>
+            <option value="chest">增加秘宝宝箱</option>
+            <option value="frag">增加秘宝碎片</option>
+            <option value="ticket">增加秘宝次数</option>
+        </select>
+        <input type="text" id="cheat-val" class="cheat-input" placeholder="输入数值 (支持 1e100)">
+        <div style="font-size:0.8rem; color:#888;">支持极大数值，输入过大将变为∞</div>
+        <button class="modal-btn btn-use" onclick="game.applyCheat()">确认修改</button>
+        <button class="modal-btn btn-close" onclick="game.closeModal('cheat-modal')">关闭</button>
     </div>
 </div>
 
 <script>
+
+/**
+ * BigNum Class for handling large numbers
+ */
+class BigNum {
+    constructor(val, exp = 0) {
+        if (val instanceof BigNum) { this.m = val.m; this.e = val.e; }
+        else if (typeof val === 'string') {
+            const parts = val.toLowerCase().split('e');
+            this.m = parseFloat(parts[0]);
+            this.e = parts[1] ? parseFloat(parts[1]) : 0;
+            this.normalize();
+        } else {
+            this.m = val;
+            this.e = exp;
+            this.normalize();
+        }
+    }
+    
+    normalize() {
+        if (this.m === 0) { this.e = 0; return; }
+        const abs = Math.abs(this.m);
+        if (abs >= 10 || (abs > 0 && abs < 1)) {
+            const shift = Math.floor(Math.log10(abs));
+            this.m /= Math.pow(10, shift);
+            this.e += shift;
+        }
+    }
+
+    add(other) {
+        const o = other instanceof BigNum ? other : new BigNum(other);
+        if (this.e === o.e) return new BigNum(this.m + o.m, this.e);
+        const diff = this.e - o.e;
+        if (Math.abs(diff) > 15) return diff > 0 ? new BigNum(this) : new BigNum(o);
+        if (diff > 0) return new BigNum(this.m + o.m / Math.pow(10, diff), this.e);
+        return new BigNum(this.m / Math.pow(10, -diff) + o.m, o.e);
+    }
+    
+    sub(other) {
+        const o = other instanceof BigNum ? other : new BigNum(other);
+        return this.add(new BigNum(-o.m, o.e));
+    }
+
+    mul(other) {
+        const o = other instanceof BigNum ? other : new BigNum(other);
+        return new BigNum(this.m * o.m, this.e + o.e);
+    }
+
+    div(other) {
+        const o = other instanceof BigNum ? other : new BigNum(other);
+        if (o.m === 0) return new BigNum(Infinity);
+        return new BigNum(this.m / o.m, this.e - o.e);
+    }
+    
+    pow(power) {
+        if (this.m === 0) return new BigNum(0);
+        const valLog = Math.log10(this.m) + this.e;
+        const newLog = valLog * power;
+        const newE = Math.floor(newLog);
+        const newM = Math.pow(10, newLog - newE);
+        return new BigNum(newM, newE);
+    }
+
+    log10() {
+        if (this.m <= 0) return 0;
+        return Math.log10(this.m) + this.e;
+    }
+
+    compare(other) {
+        const o = other instanceof BigNum ? other : new BigNum(other);
+        if (this.m === 0 && o.m === 0) return 0;
+        if (this.m < 0 && o.m >= 0) return -1;
+        if (this.m >= 0 && o.m < 0) return 1;
+        
+        if (this.e > o.e) return this.m > 0 ? 1 : -1;
+        if (this.e < o.e) return this.m > 0 ? -1 : 1;
+        
+        if (this.m > o.m) return 1;
+        if (this.m < o.m) return -1;
+        return 0;
+    }
+
+    gt(other) { return this.compare(other) > 0; }
+    gte(other) { return this.compare(other) >= 0; }
+    lt(other) { return this.compare(other) < 0; }
+    lte(other) { return this.compare(other) <= 0; }
+    eq(other) { return this.compare(other) === 0; }
+    
+    toNumber() {
+        if (this.e > 308) return Infinity;
+        return this.m * Math.pow(10, this.e);
+    }
+
+    toString() {
+        if (this.e < 6) {
+            let val = this.m * Math.pow(10, this.e);
+            if (Math.abs(val) < 0.001 && val !== 0) return val.toExponential(2);
+            return parseFloat(val.toFixed(2)).toString();
+        }
+        return `${this.m.toFixed(2)}e${this.e}`;
+    }
+}
+
 /**
  * Core Config
  */
@@ -667,16 +935,16 @@ const SLOT_KEYS = Object.keys(SLOTS_CONFIG);
 // Treasures
 const TREASURE_SLOTS = ['天', '地', '玄', '黄', '宇', '宙'];
 const TREASURE_QUALITIES = {
-    'N': { val: 0.65, color: '#b0b0b0', weight: 10 },
-    'R': { val: 0.75, color: '#4caf50', weight: 10 },
-    'SR': { val: 0.9, color: '#03a9f4', weight: 10 },
-    'SSR': { val: 1.1, color: '#ffc107', weight: 10 },
-    'UR': { val: 1.5, color: '#ff3d00', weight: 10 }
+    'N': { val: 0.65, color: 'var(--t-n)', weight: 10 },
+    'R': { val: 0.75, color: 'var(--t-r)', weight: 10 },
+    'SR': { val: 0.9, color: 'var(--t-sr)', weight: 10 },
+    'SSR': { val: 1.1, color: 'var(--t-ssr)', weight: 10 },
+    'UR': { val: 1.5, color: 'var(--t-ur)', weight: 10 }
 };
 const TREASURE_ATTRS = [
-    { name: '全属性加成', type: 'all_stat', weight: 10 },
-    { name: '爬塔真意掉率', type: 'tower_drop', weight: 10 },
-    { name: '刷丹倍率', type: 'pill_mult', weight: 10 }
+    { name: '全属性加成', short: '全属', type: 'all_stat', weight: 10 },
+    { name: '爬塔真意掉率', short: '塔掉', type: 'tower_drop', weight: 10 },
+    { name: '刷丹倍率', short: '丹倍', type: 'pill_mult', weight: 10 }
 ];
 
 const QUALITIES = {
@@ -697,12 +965,25 @@ const TOWER_TYPES = [
     { name: '塔主', baseAtk: 1500, baseHp: 7500, isBoss: true }
 ];
 
+// Dungeon Scaling Constants
+const DUNGEON_TYPES = [
+    { name: '魔物', baseAtk: 0.04, baseHp: 1, type: 'mob' },
+    { name: '精英', baseAtk: 0.15, baseHp: 8, type: 'elite' },
+    { name: '深渊领主', baseAtk: 1.2, baseHp: 80, type: 'boss' }
+];
+const DUNGEON_N1_MULT = 33; 
+const DUNGEON_ATK_INC = 100; 
+const DUNGEON_HP_INC = 100; 
+
 // Utils
 function formatNum(num) {
-    if (num < 10000) return Math.floor(num);
-    if (num < 100000000) return (num / 10000).toFixed(2) + '万';
-    if (num < 1000000000000) return (num / 100000000).toFixed(2) + '亿';
-    return num.toExponential(2).replace('+', '');
+    if (num instanceof BigNum) return num.toString();
+    if (num === Infinity) return "∞";
+    if (typeof num === 'number') {
+        if (Math.abs(num) < 0.01 && num !== 0) return num.toExponential(2);
+        return parseFloat(num.toFixed(2)).toString();
+    }
+    return num;
 }
 
 function getWeightedRandom(items, weightKey = 'weight') {
@@ -734,8 +1015,8 @@ class Item {
             this.level = difficulty; 
             this.name = `混元丹 (Lv.${this.level})`;
             this.quality = 3; 
-            this.hpValue = 5 * Math.pow(SCALE_PILL, this.level);
-            this.atkValue = 1 * Math.pow(SCALE_PILL, this.level);
+            this.hpValue = new BigNum(5).mul(new BigNum(SCALE_PILL).pow(this.level));
+            this.atkValue = new BigNum(1).mul(new BigNum(SCALE_PILL).pow(this.level));
             return;
         }
         this.type = typeOverride || getWeightedRandom(SLOTS_CONFIG, 'weight');
@@ -745,9 +1026,9 @@ class Item {
         const qConfig = QUALITIES[this.quality];
         this.name = ['破铁','精钢','玄铁','秘银','龙鳞','混沌'][Math.min(5, Math.floor(this.level/10))] + SLOTS_CONFIG[this.type].name;
         
-        const baseVal = 10 * Math.pow(SCALE_EQUIP, this.level);
-        this.atk = baseVal * qConfig.mult * (Math.random() < 0.5 ? 1 : 0);
-        this.hp = baseVal * qConfig.mult * 5 * (this.atk > 0 ? 0 : 1);
+        const baseVal = new BigNum(10).mul(new BigNum(SCALE_EQUIP).pow(this.level));
+        this.atk = baseVal.mul(qConfig.mult * (Math.random() < 0.5 ? 1 : 0));
+        this.hp = baseVal.mul(qConfig.mult * 5 * (this.atk.gt(0) ? 0 : 1));
         
         if (SLOTS_CONFIG[this.type].hasCrit) {
              this.crit = qConfig.crit || 0;
@@ -770,12 +1051,12 @@ class Treasure {
         const offset = this.qualityConf.val;
         // Formula: 10 ^ (Offset * Level / 10)
         const exponent = (offset * this.level) / 10;
-        this.val = Math.pow(10, exponent);
+        this.val = new BigNum(10).pow(exponent);
         
         this.hasExtra = Math.random() < 0.5;
-        this.extraVal = 0;
+        this.extraVal = new BigNum(0);
         if (this.hasExtra) {
-            this.extraVal = Math.pow(10, (offset * this.level) / 10);
+            this.extraVal = new BigNum(10).pow((offset * this.level) / 10);
         }
         this.name = `${this.qKey}·${this.slot}·${this.attrType.name}`;
         this.score = offset * this.level * 10;
@@ -854,29 +1135,47 @@ class Dungeon {
         }
     }
 
-    spawnEnemy(type) {
-        let isBoss = (type === 'boss');
-        let baseHp = isBoss ? 10000 : (type==='elite' ? 2000 : 500);
-        let baseAtk = isBoss ? 50000 : (type==='elite' ? 20000 : 10000);
-        let scale = this.level * 10; 
+    spawnEnemy(typeKey) {
+        const conf = DUNGEON_TYPES.find(d => d.type === typeKey);
+        if(!conf) return;
+
+        let isBoss = (typeKey === 'boss');
+        
+        let atkScale, hpScale;
+
+        if (this.level === 1) {
+            atkScale = Math.pow(DUNGEON_N1_MULT, 2);
+            hpScale = Math.pow(DUNGEON_N1_MULT, 2);
+        } else {
+            atkScale = Math.pow((this.level - 1) * DUNGEON_ATK_INC, 2);
+            hpScale = Math.pow((this.level - 1) * DUNGEON_HP_INC, 2);
+        }
+
+        if(atkScale < 1) atkScale = 1;
+        if(hpScale < 1) hpScale = 1;
+
+        let baseHp = new BigNum(conf.baseHp).mul(hpScale);
+        let baseAtk = new BigNum(conf.baseAtk).mul(atkScale);
         
         this.game.enemies.push({
             id: `dungeon-${Date.now()}-${Math.random()}`,
-            name: isBoss ? `深渊领主` : (type==='elite'?'精英':'魔物'),
-            maxHp: baseHp * scale,
-            currentHp: baseHp * scale,
-            atk: baseAtk * scale,
+            name: conf.name,
+            maxHp: baseHp,
+            currentHp: baseHp,
+            atk: baseAtk,
             isBoss: isBoss,
             isDungeon: true,
-            emoji: isBoss ? '👿' : (type==='elite'?'👺':'💀')
+            emoji: isBoss ? '👿' : (typeKey==='elite'?'👺':'💀')
         });
         this.game.updateCombatUI(true);
     }
 
     victory() {
         this.game.log('SYS', `副本通关！30秒后开启下一轮。`);
-        this.game.log('SYS', `已通关！可前往秘宝阁开启宝箱。`);
+        this.game.log('SYS', `获得宝箱！可在秘宝阁开启。`);
+        this.game.treasureChests++; 
         this.active = false; 
+        this.game.updateSystemUI();
         
         this.timeRemaining = 30;
         this.startCountdown(() => {
@@ -910,8 +1209,8 @@ class Dungeon {
 
 class Game {
     constructor() {
-        this.playerBase = { hp: 300, atk: 50, crit: 0 };
-        this.currentHp = 300;
+        this.playerBase = { hp: new BigNum(300), atk: new BigNum(50), crit: 0 };
+        this.currentHp = new BigNum(300);
         this.difficulty = 1;
         
         this.equipment = {};
@@ -919,17 +1218,18 @@ class Game {
         TREASURE_SLOTS.forEach(s => this.equippedTreasures[s] = null);
         
         this.treasureBag = []; 
-        this.treasureDaily = 20;
+        this.treasureChests = 0; // New: Chests from dungeon
+        this.treasureDaily = 20; // Keys
         this.treasureLimit = 20;
-        this.treasureFragments = 0;
+        this.treasureFragments = new BigNum(0);
         
         this.enemies = []; 
         this.mode = 'wild';
         
-        this.lawFragments = 0;
+        this.lawFragments = new BigNum(0);
         this.cultRound = 0;
         this.cultStep = 0;
-        this.lawMultipliers = { atk: 1.0, hp: 1.0 };
+        this.lawMultipliers = { atk: new BigNum(1), hp: new BigNum(1) };
         
         this.towerLevel = 0;
         this.dungeon = new Dungeon(this);
@@ -972,30 +1272,30 @@ class Game {
     // --- Stats ---
     getTotalStats() {
         let stats = { ...this.playerBase };
-        let maxHp = stats.hp;
+        let maxHp = new BigNum(stats.hp); 
 
         for (let key in this.equipment) {
             const item = this.equipment[key];
             if (item) {
-                stats.atk += item.atk || 0;
-                maxHp += item.hp || 0;
+                stats.atk = stats.atk.add(item.atk);
+                maxHp = maxHp.add(item.hp);
                 stats.crit += item.crit || 0;
             }
         }
         
-        stats.atk *= this.lawMultipliers.atk;
-        maxHp *= this.lawMultipliers.hp;
+        stats.atk = stats.atk.mul(this.lawMultipliers.atk);
+        maxHp = maxHp.mul(this.lawMultipliers.hp);
         
-        let tMult = 1.0;
+        let tMult = new BigNum(1);
         for (let key in this.equippedTreasures) {
             const t = this.equippedTreasures[key];
             if (t && t.attrType.type === 'all_stat') {
-                tMult *= t.val;
-                if(t.hasExtra) tMult *= t.extraVal;
+                tMult = tMult.mul(t.val);
+                if(t.hasExtra) tMult = tMult.mul(t.extraVal);
             }
         }
-        stats.atk *= tMult;
-        maxHp *= tMult;
+        stats.atk = stats.atk.mul(tMult);
+        maxHp = maxHp.mul(tMult);
 
         return { ...stats, maxHp };
     }
@@ -1079,8 +1379,10 @@ class Game {
             this.lastTick = now;
         }
         const stats = this.getTotalStats();
-        if (!this.isDead && this.currentHp < stats.maxHp && this.currentHp > 0) {
-            this.currentHp = Math.min(stats.maxHp, this.currentHp + stats.maxHp * 0.05);
+        if (!this.isDead && this.currentHp.lt(stats.maxHp) && this.currentHp.gt(0)) {
+            const regen = stats.maxHp.mul(0.05);
+            this.currentHp = this.currentHp.add(regen);
+            if(this.currentHp.gt(stats.maxHp)) this.currentHp = stats.maxHp;
             this.updateCombatUI();
         }
         requestAnimationFrame(() => this.loop());
@@ -1088,14 +1390,14 @@ class Game {
 
     combatTurn() {
         if (this.isDead) return;
-        this.enemies = this.enemies.filter(e => e.currentHp > 0);
+        this.enemies = this.enemies.filter(e => e.currentHp.gt(0));
         
         if (this.mode !== 'dungeon' && this.enemies.filter(e => !e.isBoss).length < 10) {
             this.spawnWildWave();
         }
         if (this.mode === 'dungeon') this.dungeon.checkWaveClear();
 
-        if (this.currentHp <= 0) {
+        if (this.currentHp.lte(0)) {
             this.handleLoss();
             return;
         }
@@ -1104,53 +1406,65 @@ class Game {
         
         // Damage (Player -> Enemy)
         let atk = pStats.atk;
-        if (this.mode === 'dungeon') atk = Math.pow(Math.log10(Math.max(10, atk)), 2);
+        if (this.mode === 'dungeon') {
+            let logVal = atk.log10();
+            if(logVal < 0) logVal = 0;
+            atk = new BigNum(Math.pow(logVal, 2));
+        }
 
         const isSkill = Math.random() < 0.3;
         if (isSkill) {
             this.showSkillEffect("横扫千军!");
-            this.enemies.forEach(e => this.dealDamage(e, atk * 1.1, pStats.crit));
+            this.enemies.forEach(e => this.dealDamage(e, atk.mul(1.1), pStats.crit));
         } else {
             if (this.enemies[0]) this.dealDamage(this.enemies[0], atk, pStats.crit);
         }
 
         // Damage (Enemy -> Player)
-        let totalDmg = 0;
+        let totalDmg = new BigNum(0);
         this.enemies.forEach(e => {
-            let eAtk = e.atk;
-            if (this.mode === 'dungeon') {
-                eAtk = Math.pow(Math.log10(Math.max(10, eAtk)), 2);
-            }
-            totalDmg += eAtk;
+            totalDmg = totalDmg.add(e.atk);
         });
 
         if (this.mode === 'dungeon') {
-            // Effective HP Formula: log(HP)^2 * 5
-            const effMax = Math.pow(Math.log10(Math.max(10, pStats.maxHp)), 2) * 5;
-            const dmgPct = totalDmg / effMax;
-            this.currentHp -= pStats.maxHp * dmgPct; // Scale real damage
-            if(totalDmg > 0) this.showDamage(totalDmg, 'player'); 
+            let logHp = pStats.maxHp.log10();
+            if(logHp < 0) logHp = 0;
+            const ehpVal = Math.pow(logHp, 2) * 5;
+            
+            if (ehpVal < 1) {
+                this.currentHp = new BigNum(0); 
+            } else {
+                let pct = totalDmg.div(new BigNum(ehpVal));
+                let realDmg = this.currentHp.mul(pct);
+                this.currentHp = this.currentHp.sub(realDmg);
+                if(realDmg.gt(0)) this.showDamage(realDmg, 'player'); 
+            }
         } else {
-            this.currentHp -= totalDmg;
-            if(totalDmg > 0) this.showDamage(totalDmg, 'player');
+            this.currentHp = this.currentHp.sub(totalDmg);
+            if(totalDmg.gt(0)) this.showDamage(totalDmg, 'player');
         }
 
-        if (this.currentHp <= 0) this.handleLoss();
+        if (this.currentHp.lte(0)) this.handleLoss();
         this.updateCombatUI();
     }
 
     dealDamage(enemy, amt, critRate) {
-        if (Math.random() * 100 < critRate) amt *= 2;
-        enemy.currentHp -= amt;
-        this.showDamage(amt, enemy.id, amt > this.getTotalStats().atk ? true : false);
-        if (enemy.currentHp <= 0) this.handleKill(enemy);
+        let finalAmt = new BigNum(amt);
+        let isCrit = false;
+        if (Math.random() * 100 < critRate) {
+            finalAmt = finalAmt.mul(2);
+            isCrit = true;
+        }
+        enemy.currentHp = enemy.currentHp.sub(finalAmt);
+        this.showDamage(finalAmt, enemy.id, isCrit);
+        if (enemy.currentHp.lte(0)) this.handleKill(enemy);
     }
 
     handleKill(enemy) {
         if (this.mode === 'tower') {
             if (enemy.isBoss) {
                 this.towerLevel++;
-                this.lastBossDeathTime = Date.now(); // Set CD for tower boss too
+                this.lastBossDeathTime = Date.now(); 
                 this.log('GAIN', '击败塔主！层数+1');
                 this.rollTowerLoot(true);
                 this.updateButtons();
@@ -1173,7 +1487,7 @@ class Game {
     handleLoss() {
         if (this.isDead) return;
         this.isDead = true;
-        this.currentHp = 0;
+        this.currentHp = new BigNum(0);
         let reviveTime = (this.mode === 'dungeon') ? 15000 : 2000;
         
         let remaining = reviveTime / 1000;
@@ -1220,24 +1534,35 @@ class Game {
     // --- Treasure System ---
     openTreasureBox(count) {
         if (this.treasureDaily < count) {
-            this.log('SYS', '今日秘宝次数已尽！');
+            this.log('SYS', '今日秘宝次数不足！');
             return;
         }
+        if (this.treasureChests < count) {
+            this.log('SYS', '没有宝箱了！请去副本刷取。');
+            return;
+        }
+        
         this.treasureDaily -= count;
+        this.treasureChests -= count;
         
         const num = Math.floor(Math.random() * 2) + 3; // 3-4
         for(let i=0; i<num; i++) {
             const t = new Treasure(this.difficulty + 1);
             this.treasureBag.push(t);
-            this.log('GAIN', `获得秘宝: <span class="t-${t.qKey}">${t.name}</span>`);
+            this.log('GAIN', `获得秘宝: <span style="color:${TREASURE_QUALITIES[t.qKey].color}">${t.name}</span>`);
         }
         this.updateSystemUI();
         this.updateTreasureUI();
     }
 
+    openTreasureModal() {
+        document.getElementById('treasure-full-modal').style.display = 'flex';
+        this.updateTreasureUI();
+    }
+
     exchangeTreasure() {
-        if (this.treasureFragments >= 100) {
-            this.treasureFragments -= 100;
+        if (this.treasureFragments.gte(100)) {
+            this.treasureFragments = this.treasureFragments.sub(100);
             const t = new Treasure(this.difficulty + 1);
             this.treasureBag.push(t);
             this.log('GAIN', `兑换成功: ${t.name}`);
@@ -1253,7 +1578,7 @@ class Game {
         this.treasureBag = this.treasureBag.filter(t => {
             if (!t.isLocked) {
                 count++;
-                this.treasureFragments += 10;
+                this.treasureFragments = this.treasureFragments.add(10);
                 return false;
             }
             return true;
@@ -1263,10 +1588,10 @@ class Game {
         this.updateTreasureUI();
     }
 
-    redeemCode() {
-        const input = document.getElementById('redeem-code');
+    redeemCode(source) {
+        const inputId = source === 'modal' ? 'redeem-code-modal' : 'redeem-code';
+        const input = document.getElementById(inputId);
         if (input.value === 'VIP666') {
-            const max = this.treasureLimit; 
             const added = Math.min(this.treasureLimit - this.treasureDaily, 10);
             if (added > 0) {
                 this.treasureDaily += added;
@@ -1276,6 +1601,7 @@ class Game {
             }
             input.value = '';
             this.updateSystemUI();
+            this.updateTreasureUI();
         } else {
             this.log('SYS', '无效兑换码');
         }
@@ -1288,7 +1614,8 @@ class Game {
 
         const modal = document.getElementById('item-modal');
         document.getElementById('modal-title').innerText = t.name;
-        document.getElementById('modal-title').className = `t-${t.qKey}`;
+        // Fix for color class
+        document.getElementById('modal-title').style.color = TREASURE_QUALITIES[t.qKey].color;
         
         let desc = `等级: ${t.level}<br>${t.attrType.name}: ${formatNum(t.val)}倍`;
         if (t.hasExtra) desc += `<br>(VIP)额外加成: ${formatNum(t.extraVal)}倍`;
@@ -1309,7 +1636,7 @@ class Game {
         modal.style.display = 'flex';
     }
 
-    closeModal() { document.getElementById('item-modal').style.display = 'none'; }
+    closeModal(id) { document.getElementById(id).style.display = 'none'; }
 
     equipTreasure(index) {
         const t = this.treasureBag[index];
@@ -1320,7 +1647,7 @@ class Game {
         
         if (old) this.treasureBag.push(old); 
         
-        this.closeModal();
+        this.closeModal('item-modal');
         this.updateTreasureUI();
         this.updateSystemUI(); 
         this.updateStatsUI();
@@ -1332,7 +1659,7 @@ class Game {
             this.equippedTreasures[slot] = null;
             this.treasureBag.push(t);
         }
-        this.closeModal();
+        this.closeModal('item-modal');
         this.updateTreasureUI();
         this.updateStatsUI();
     }
@@ -1345,8 +1672,8 @@ class Game {
 
     decomposeSingle(index) {
         this.treasureBag.splice(index, 1);
-        this.treasureFragments += 10;
-        this.closeModal();
+        this.treasureFragments = this.treasureFragments.add(10);
+        this.closeModal('item-modal');
         this.updateSystemUI();
         this.updateTreasureUI();
     }
@@ -1354,62 +1681,157 @@ class Game {
     updateTreasureUI() {
         // Equip Grid
         TREASURE_SLOTS.forEach(slot => {
-            const el = document.getElementById(`treasure-equip-${slot}`);
-            let container = document.getElementById('treasure-equip-grid');
-            if (!el) {
-                const div = document.createElement('div');
-                div.className = 'equip-slot empty';
-                div.id = `treasure-equip-${slot}`;
-                div.onclick = () => this.showItemModal(slot, true);
-                div.innerHTML = `<div>🔮</div><div>${slot}</div>`;
-                container.appendChild(div);
-            }
-            
-            const div = document.getElementById(`treasure-equip-${slot}`);
-            const t = this.equippedTreasures[slot];
-            if (t) {
-                div.className = `equip-slot t-${t.qKey}`;
-                div.innerHTML = `<div>🔮</div><div>${t.name.split('·')[2]}</div>`;
-            } else {
-                div.className = 'equip-slot empty';
-                div.innerHTML = `<div>🔮</div><div>${slot}</div>`;
-            }
+            const updateSlot = (containerSelector) => {
+                const container = document.querySelector(containerSelector);
+                if (!container) return;
+                
+                let el = container.querySelector(`[data-slot="${slot}"]`);
+                if (!el) {
+                    el = document.createElement('div');
+                    el.className = 'equip-slot empty';
+                    el.setAttribute('data-slot', slot);
+                    el.onclick = () => this.showItemModal(slot, true);
+                    el.oncontextmenu = (e) => { e.preventDefault(); this.unequipTreasure(slot); };
+                    container.appendChild(el);
+                }
+                
+                const t = this.equippedTreasures[slot];
+                if (t) {
+                    el.className = `equip-slot`;
+                    el.style.borderColor = TREASURE_QUALITIES[t.qKey].color;
+                    el.style.color = TREASURE_QUALITIES[t.qKey].color;
+                    el.innerHTML = `
+                        <div class="t-lvl">Lv.${t.level}</div>
+                        <div>🔮</div>
+                        <div>${t.name.split('·')[2]}</div>
+                        <div class="t-attr">${t.attrType.short} ${formatNum(t.val)}</div>
+                    `;
+                } else {
+                    el.className = 'equip-slot empty';
+                    el.style.borderColor = '#444';
+                    el.style.color = '#888';
+                    el.innerHTML = `<div>🔮</div><div>${slot}</div>`;
+                }
+            };
+
+            updateSlot('#game-container #treasure-equip-grid');
+            updateSlot('#treasure-full-modal #treasure-equip-grid');
         });
 
         // Bag Grid
-        const bagContainer = document.getElementById('treasure-bag');
-        bagContainer.innerHTML = '';
-        this.treasureBag.forEach((t, i) => {
-            const div = document.createElement('div');
-            div.className = `equip-slot t-${t.qKey}`;
-            div.style.position = 'relative';
-            div.innerHTML = `
-                <div>${t.slot}</div>
-                <div style="font-size:0.6rem">${formatNum(t.val)}x</div>
-                ${t.isLocked ? '<div class="locked-icon">🔒</div>' : ''}
-            `;
-            div.onclick = () => this.showItemModal(i, false);
-            bagContainer.appendChild(div);
-        });
+        const updateBag = (containerSelector) => {
+            const container = document.querySelector(containerSelector);
+            if (!container) return;
+            container.innerHTML = '';
+            
+            this.treasureBag.forEach((t, i) => {
+                const div = document.createElement('div');
+                div.className = `equip-slot`;
+                div.style.position = 'relative';
+                div.style.borderColor = TREASURE_QUALITIES[t.qKey].color;
+                div.style.color = TREASURE_QUALITIES[t.qKey].color;
+                
+                div.innerHTML = `
+                    <div class="t-lvl">Lv.${t.level}</div>
+                    <div>${t.slot}</div>
+                    <div class="t-attr">${t.attrType.short}</div>
+                    <div style="font-size:0.6rem">${formatNum(t.val)}x</div>
+                    ${t.isLocked ? '<div class="locked-icon">🔒</div>' : ''}
+                `;
+                div.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    this.equipTreasure(i);
+                };
+                div.onclick = () => this.showItemModal(i, false);
+                container.appendChild(div);
+            });
+        };
+
+        updateBag('#treasure-bag');
+        const modalBag = document.querySelector('#treasure-full-modal #treasure-bag');
+        if(modalBag) updateBag('#treasure-full-modal #treasure-bag');
         
+        // Update Bonus Text
         let bonus = "";
-        let drops = 0, pills = 0;
+        let drops = new BigNum(0), pills = new BigNum(0);
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
             if(t) {
-                if(t.attrType.type === 'tower_drop') drops += t.val;
-                if(t.attrType.type === 'pill_mult') pills += t.val;
+                if(t.attrType.type === 'tower_drop') drops = drops.add(t.val);
+                if(t.attrType.type === 'pill_mult') pills = pills.add(t.val);
             }
         }
-        if (drops > 0) bonus += `塔掉落x${formatNum(drops)} `;
-        if (pills > 0) bonus += `丹倍率x${formatNum(pills)}`;
-        document.getElementById('bonus-treasure').innerText = bonus || "无";
+        if (drops.gt(0)) bonus += `塔掉落x${formatNum(drops)} `;
+        if (pills.gt(0)) bonus += `丹倍率x${formatNum(pills)}`;
+        const bonusEl = document.getElementById('bonus-treasure');
+        if(bonusEl) bonusEl.innerText = bonus || "无";
+        
+        // Update Counts
+        const chest = this.treasureChests;
+        const daily = `${this.treasureDaily}/${this.treasureLimit}`;
+        const frags = formatNum(this.treasureFragments);
+
+        if(document.getElementById('modal-chest-count')) document.getElementById('modal-chest-count').innerText = chest;
+        if(document.getElementById('modal-daily-count')) document.getElementById('modal-daily-count').innerText = daily;
+        if(document.getElementById('modal-frag-count')) document.getElementById('modal-frag-count').innerText = frags;
+        
+        if(document.getElementById('chest-count')) document.getElementById('chest-count').innerText = chest;
+    }
+
+    // --- Cheat System ---
+    toggleCheatModal() {
+        document.getElementById('cheat-modal').style.display = 'flex';
+    }
+
+    applyCheat() {
+        const type = document.getElementById('cheat-type').value;
+        const valStr = document.getElementById('cheat-val').value;
+        let val = new BigNum(valStr); // Use BigNum parsing
+        
+        switch(type) {
+            case 'atk':
+                this.playerBase.atk = this.playerBase.atk.add(val);
+                this.log('SYS', `金手指: 基础攻击 +${formatNum(val)}`);
+                break;
+            case 'hp':
+                this.playerBase.hp = this.playerBase.hp.add(val);
+                this.log('SYS', `金手指: 基础生命 +${formatNum(val)}`);
+                break;
+            case 'curHp':
+                this.currentHp = this.currentHp.add(val);
+                const max = this.getTotalStats().maxHp;
+                if(this.currentHp.gt(max)) this.currentHp = max;
+                this.log('SYS', `金手指: 恢复生命 +${formatNum(val)}`);
+                break;
+            case 'law':
+                this.lawFragments = this.lawFragments.add(val);
+                this.log('SYS', `金手指: 法则真意 +${formatNum(val)}`);
+                break;
+            case 'chest':
+                this.treasureChests += val.toNumber();
+                this.log('SYS', `金手指: 秘宝宝箱 +${formatNum(val)}`);
+                break;
+            case 'frag':
+                this.treasureFragments = this.treasureFragments.add(val);
+                this.log('SYS', `金手指: 秘宝碎片 +${formatNum(val)}`);
+                break;
+            case 'ticket':
+                // For ticket we might just use normal number, but BigNum works
+                this.treasureDaily += val.toNumber();
+                this.log('SYS', `金手指: 秘宝次数 +${formatNum(val)}`);
+                break;
+        }
+        
+        this.updateStatsUI();
+        this.updateSystemUI();
+        this.updateTreasureUI();
+        this.closeModal('cheat-modal');
     }
 
     // --- Other Logic ---
     spawnWildWave() {
         if(this.mode === 'dungeon') return;
-        const scale = this.mode==='tower' ? Math.pow(SCALE_TOWER_STR, this.towerLevel) : Math.pow(SCALE_ENEMY, this.difficulty);
+        const scale = this.mode==='tower' ? new BigNum(SCALE_TOWER_STR).pow(this.towerLevel) : new BigNum(SCALE_ENEMY).pow(this.difficulty);
         const type = this.mode==='tower' ? TOWER_TYPES[0] : ENEMY_TYPES[0];
         
         let emojis = [];
@@ -1423,9 +1845,9 @@ class Game {
             this.enemies.push({
                 id: `mob-${Date.now()}-${Math.random()}`,
                 name: type.name,
-                maxHp: type.baseHp * scale,
-                currentHp: type.baseHp * scale,
-                atk: type.baseAtk * scale,
+                maxHp: new BigNum(type.baseHp).mul(scale),
+                currentHp: new BigNum(type.baseHp).mul(scale),
+                atk: new BigNum(type.baseAtk).mul(scale),
                 isBoss: false,
                 emoji: emojis[Math.floor(Math.random() * emojis.length)]
             });
@@ -1444,14 +1866,14 @@ class Game {
 
     summonBoss() {
         if (this.isBossAlive()) return;
-        const scale = this.mode==='tower' ? Math.pow(SCALE_TOWER_STR, this.towerLevel) : Math.pow(SCALE_ENEMY, this.difficulty);
+        const scale = this.mode==='tower' ? new BigNum(SCALE_TOWER_STR).pow(this.towerLevel) : new BigNum(SCALE_ENEMY).pow(this.difficulty);
         const type = this.mode==='tower' ? TOWER_TYPES[1] : ENEMY_TYPES[1];
         this.enemies.push({
             id: `boss-${Date.now()}`,
             name: type.name,
-            maxHp: type.baseHp * scale,
-            currentHp: type.baseHp * scale,
-            atk: type.baseAtk * scale,
+            maxHp: new BigNum(type.baseHp).mul(scale),
+            currentHp: new BigNum(type.baseHp).mul(scale),
+            atk: new BigNum(type.baseAtk).mul(scale),
             isBoss: true,
             emoji: '👹'
         });
@@ -1465,13 +1887,14 @@ class Game {
     }
 
     rollWildLoot(isBoss) {
-        let pillMult = 1;
+        let pillMult = new BigNum(1);
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
-            if(t && t.attrType.type === 'pill_mult') pillMult *= t.val; 
+            if(t && t.attrType.type === 'pill_mult') pillMult = pillMult.mul(t.val); 
         }
         const pill = new Item(this.difficulty, 'pill');
-        pill.hpValue *= pillMult; pill.atkValue *= pillMult;
+        pill.hpValue = pill.hpValue.mul(pillMult); 
+        pill.atkValue = pill.atkValue.mul(pillMult);
         this.autoConsumePill(pill);
 
         if (Math.random() < (isBoss ? 1 : 0.5)) {
@@ -1480,36 +1903,38 @@ class Game {
     }
 
     rollTowerLoot(isBoss) {
-        let drop = Math.pow(SCALE_TOWER_DROP, this.towerLevel) * (1 + this.cultRound);
-        if(isBoss) drop *= 10;
+        let drop = new BigNum(SCALE_TOWER_DROP).pow(this.towerLevel).mul(1 + this.cultRound);
+        if(isBoss) drop = drop.mul(10);
         
-        let tMult = 1;
+        let tMult = new BigNum(1);
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
-            if(t && t.attrType.type === 'tower_drop') tMult *= t.val;
+            if(t && t.attrType.type === 'tower_drop') tMult = tMult.mul(t.val);
         }
-        drop *= tMult;
+        drop = drop.mul(tMult);
         
-        this.lawFragments += drop;
+        this.lawFragments = this.lawFragments.add(drop);
         this.log('GAIN', `获得真意: ${formatNum(drop)}`);
         this.updateSystemUI();
     }
 
     autoConsumePill(pill) {
-        this.playerBase.hp += pill.hpValue;
-        this.playerBase.atk += pill.atkValue;
+        this.playerBase.hp = this.playerBase.hp.add(pill.hpValue);
+        this.playerBase.atk = this.playerBase.atk.add(pill.atkValue);
         this.updateStatsUI();
     }
 
     checkAutoEquip(newItem) {
         const curr = this.equipment[newItem.type];
-        const score = (i) => (i.hp||0) + (i.atk||0)*5;
-        if (!curr || score(newItem) > score(curr)) {
+        // Score: HP + 5*Atk
+        const getScore = (i) => i.hp.add(i.atk.mul(5));
+        
+        if (!curr || getScore(newItem).gt(getScore(curr))) {
             this.equipment[newItem.type] = newItem;
             this.log('GAIN', `换装: ${newItem.name}`);
             this.updateEquipUI();
         } else {
-            this.playerBase.hp += 1;
+            this.playerBase.hp = this.playerBase.hp.add(1);
         }
         this.updateStatsUI();
     }
@@ -1527,11 +1952,11 @@ class Game {
     }
 
     cultivate() {
-        const cost = 2 * Math.pow(2, this.cultRound);
-        if (this.lawFragments >= cost) {
-            this.lawFragments -= cost;
-            if (this.cultStep % 2 === 0) this.lawMultipliers.atk *= 1.1;
-            else this.lawMultipliers.hp *= 1.1;
+        const cost = new BigNum(2).mul(new BigNum(2).pow(this.cultRound));
+        if (this.lawFragments.gte(cost)) {
+            this.lawFragments = this.lawFragments.sub(cost);
+            if (this.cultStep % 2 === 0) this.lawMultipliers.atk = this.lawMultipliers.atk.mul(1.1);
+            else this.lawMultipliers.hp = this.lawMultipliers.hp.mul(1.1);
             this.cultStep++;
             if (this.cultStep >= 10) { this.cultStep = 0; this.cultRound++; }
             this.updateSystemUI();
@@ -1549,31 +1974,44 @@ class Game {
     }
 
     updateSystemUI() {
-        document.getElementById('res-law').innerText = formatNum(this.lawFragments);
-        document.getElementById('cult-round').innerText = this.cultRound;
-        document.getElementById('cult-step').innerText = `${this.cultStep}/10`;
-        document.getElementById('cult-cost').innerText = formatNum(2 * Math.pow(2, this.cultRound));
-        document.getElementById('cult-next').innerText = (this.cultStep%2===0 ? "攻击" : "生命") + " x1.1";
+        const setVal = (id, val) => {
+            const el = document.getElementById(id);
+            if(el) el.innerText = val;
+        };
+
+        setVal('res-law', formatNum(this.lawFragments));
+        setVal('cult-round', this.cultRound);
+        setVal('cult-step', `${this.cultStep}/10`);
+        const cost = new BigNum(2).mul(new BigNum(2).pow(this.cultRound));
+        setVal('cult-cost', formatNum(cost));
+        setVal('cult-next', (this.cultStep%2===0 ? "攻击" : "生命") + " x1.1");
         
-        document.getElementById('tower-lv').innerText = this.towerLevel;
-        document.getElementById('tower-drop').innerText = formatNum(Math.pow(SCALE_TOWER_DROP, this.towerLevel));
+        setVal('tower-lv', this.towerLevel);
+        setVal('tower-drop', formatNum(new BigNum(SCALE_TOWER_DROP).pow(this.towerLevel)));
         
-        document.getElementById('dungeon-lv').innerText = this.difficulty;
-        document.getElementById('dungeon-status').innerText = this.dungeon.active ? `波次 ${Math.min(this.dungeon.wave+1, 3)}/3` : "待机";
+        setVal('dungeon-lv', this.difficulty);
+        setVal('dungeon-status', this.dungeon.active ? `波次 ${Math.min(this.dungeon.wave+1, 3)}/3` : "待机");
         if(document.getElementById('dungeon-timer')) document.getElementById('dungeon-timer').innerText = this.dungeon.timeRemaining > 0 ? `${this.dungeon.timeRemaining}s` : "--";
         
-        document.getElementById('treasure-daily').innerText = `${this.treasureDaily}/${this.treasureLimit}`;
-        document.getElementById('treasure-frags').innerText = this.treasureFragments;
+        setVal('treasure-daily', `${this.treasureDaily}/${this.treasureLimit}`);
+        setVal('treasure-frags', formatNum(this.treasureFragments));
+        
+        setVal('chest-count', this.treasureChests);
     }
 
     updateStatsUI() {
         const s = this.getTotalStats();
-        document.getElementById('stat-hp').innerText = `${formatNum(Math.max(0, this.currentHp))} / ${formatNum(s.maxHp)}`;
+        // Prevent negative zero or weird display
+        let cur = this.currentHp;
+        if(cur.lt(0)) cur = new BigNum(0);
+        
+        document.getElementById('stat-hp').innerText = `${formatNum(cur)} / ${formatNum(s.maxHp)}`;
         document.getElementById('stat-atk').innerText = formatNum(s.atk);
         if(document.getElementById('stat-crit')) document.getElementById('stat-crit').innerText = s.crit + '%';
         
-        const atkMul = (this.lawMultipliers.atk * 100).toFixed(0) + '%';
-        const hpMul = (this.lawMultipliers.hp * 100).toFixed(0) + '%';
+        // Multipliers
+        const atkMul = this.lawMultipliers.atk.mul(100).toString() + '%';
+        const hpMul = this.lawMultipliers.hp.mul(100).toString() + '%';
         document.getElementById('mul-atk').innerText = `${atkMul} / ${hpMul}`;
         
         document.getElementById('mul-drop').innerText = "+" + (this.cultRound * 100) + '%';
@@ -1581,7 +2019,14 @@ class Game {
 
     updateCombatUI(force) {
         const s = this.getTotalStats();
-        const pct = Math.min(100, Math.max(0, (this.currentHp / s.maxHp) * 100));
+        // Calculate percentage for HP bar
+        let pct = 0;
+        if (s.maxHp.gt(0)) {
+            // Using log scale for percentage if numbers are huge? No, linear is standard for HP bars.
+            // But we need to handle BigNum division result -> number
+            let ratio = this.currentHp.div(s.maxHp).toNumber();
+            pct = Math.min(100, Math.max(0, ratio * 100));
+        }
         document.getElementById('player-hp-bar').style.width = pct + '%';
         
         const c = document.getElementById('enemy-container');
@@ -1591,15 +2036,22 @@ class Game {
                 const el = document.createElement('div');
                 el.className = `entity ${e.isBoss?'boss-entity':'enemy-entity'}`;
                 el.id = `e-${e.id}`;
-                el.innerHTML = `<div class="enemy-stats">${formatNum(e.atk)}<br>${formatNum(Math.max(0, e.currentHp))}</div>${e.emoji}<div class="hp-bar-container"><div class="hp-bar-fill enemy-hp" style="width:${Math.max(0, e.currentHp)/e.maxHp*100}%"></div></div>`;
+                
+                let hpPct = 100;
+                if(e.maxHp.gt(0)) hpPct = Math.min(100, Math.max(0, e.currentHp.div(e.maxHp).toNumber() * 100));
+                
+                el.innerHTML = `<div class="enemy-stats">${formatNum(e.atk)}<br>${formatNum(e.currentHp)}</div>${e.emoji}<div class="hp-bar-container"><div class="hp-bar-fill enemy-hp" style="width:${hpPct}%"></div></div>`;
                 c.appendChild(el);
             });
         } else {
             this.enemies.forEach(e => {
                 const el = document.getElementById(`e-${e.id}`);
                 if(el) {
-                    el.querySelector('.enemy-stats').innerHTML = `${formatNum(e.atk)}<br>${formatNum(Math.max(0, e.currentHp))}`;
-                    el.querySelector('.hp-bar-fill').style.width = (Math.max(0, e.currentHp)/e.maxHp*100)+'%';
+                    let hpPct = 100;
+                    if(e.maxHp.gt(0)) hpPct = Math.min(100, Math.max(0, e.currentHp.div(e.maxHp).toNumber() * 100));
+                    
+                    el.querySelector('.enemy-stats').innerHTML = `${formatNum(e.atk)}<br>${formatNum(e.currentHp)}`;
+                    el.querySelector('.hp-bar-fill').style.width = hpPct+'%';
                 }
             });
         }
@@ -1618,10 +2070,7 @@ class Game {
         } else {
             const tEl = document.getElementById(`e-${target}`);
             if (tEl) {
-                // Simple approx positioning for grid
                 const rect = tEl.getBoundingClientRect();
-                // Since we can't easily map rect to overlay percentage without more math, 
-                // just randomize slightly to simulate "on the field"
                 el.style.color = '#fff';
                 el.style.left = (10 + Math.random()*80) + '%';
                 el.style.top = (20 + Math.random()*40) + '%';
