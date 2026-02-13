@@ -28,6 +28,8 @@ class Treasure {
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Treasure;
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = Treasure;
+    }
+} catch (e) {}

@@ -101,6 +101,8 @@ class BigNum {
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = BigNum;
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = BigNum;
+    }
+} catch (e) {}

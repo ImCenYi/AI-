@@ -34,6 +34,8 @@ class Item {
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Item;
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = Item;
+    }
+} catch (e) {}

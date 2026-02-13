@@ -6,7 +6,8 @@ class Dungeon {
     constructor(game) {
         this.game = game;
         this.active = false;
-        this.level = 1;
+        this.tier = 1;      // 副本层数 T1, T2, T3...
+        this.level = 1;     // 副本难度等级
         this.wave = 0;
         this.waves = [
             [{ type: 'mob', count: 10, delay: 0 }],
@@ -20,9 +21,31 @@ class Dungeon {
         this.spawnEventsCompleted = 0;
     }
 
+    // 检查指定层数是否已解锁
+    isUnlocked(tier) {
+        const required = getDungeonUnlockRequirement(tier);
+        return this.game.difficulty >= required;
+    }
+
+    // 获取当前已解锁的最高层数
+    getMaxUnlockedTier() {
+        for (let t = MAX_DUNGEON_TIER; t >= 1; t--) {
+            if (this.isUnlocked(t)) return t;
+        }
+        return 0;
+    }
+
+    // 获取解锁下一层所需的主线层数
+    getNextUnlockRequirement() {
+        const nextTier = this.getMaxUnlockedTier() + 1;
+        if (nextTier > MAX_DUNGEON_TIER) return null;
+        return getDungeonUnlockRequirement(nextTier);
+    }
+
     start() {
         this.active = true;
-        this.level = this.game.difficulty; 
+        // 副本难度 = 基础难度 * 层数倍率
+        this.level = this.game.difficulty * this.tier; 
         this.wave = 0;
         this.game.enemies = [];
         this.spawnEventsScheduled = 0;
@@ -141,12 +164,49 @@ class Dungeon {
     updateUI() {
         const statusEl = document.getElementById('dungeon-status');
         const timerEl = document.getElementById('dungeon-timer');
-        if (statusEl) statusEl.innerText = this.active ? `波次 ${Math.min(this.wave+1, 3)}/3` : "待机";
+        const tierEl = document.getElementById('dungeon-tier');
+        
+        if (statusEl) {
+            if (!this.isUnlocked(this.tier)) {
+                statusEl.innerText = `🔒 需主线N${getDungeonUnlockRequirement(this.tier)}`;
+            } else {
+                statusEl.innerText = this.active ? `波次 ${Math.min(this.wave+1, 3)}/3` : "待机";
+            }
+        }
         if (timerEl) timerEl.innerText = this.timeRemaining > 0 ? `${this.timeRemaining}s` : "--";
+        if (tierEl) tierEl.innerText = `T${this.tier}`;
+        
+        // 更新层数选择按钮状态
+        this.updateTierButtons();
+    }
+
+    updateTierButtons() {
+        for (let t = 1; t <= MAX_DUNGEON_TIER; t++) {
+            const btn = document.getElementById(`dungeon-tier-${t}`);
+            if (btn) {
+                const unlocked = this.isUnlocked(t);
+                btn.classList.toggle('locked', !unlocked);
+                btn.classList.toggle('active', this.tier === t && unlocked);
+                btn.disabled = !unlocked;
+            }
+        }
+    }
+
+    setTier(tier) {
+        if (tier < 1 || tier > MAX_DUNGEON_TIER) return false;
+        if (!this.isUnlocked(tier)) {
+            this.game.log('SYS', `副本T${tier}需主线N${getDungeonUnlockRequirement(tier)}解锁！`);
+            return false;
+        }
+        this.tier = tier;
+        this.updateUI();
+        return true;
     }
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Dungeon;
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = Dungeon;
+    }
+} catch (e) {}

@@ -112,27 +112,35 @@ h1 { margin: 0; font-size: 1.2rem; color: #ffd700; }
 /* Tabs System */
 .tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     border-bottom: 1px solid #444;
     margin-bottom: 10px;
-    gap: 2px;
+    gap: 4px;
 }
 .tab-btn {
-    flex: 1 0 40%;
-    padding: 6px;
-    background: #2a2a2a;
-    border: none;
+    flex: 1;
+    padding: 10px 6px;
+    background: linear-gradient(180deg, #2a2a2a, #1a1a1a);
+    border: 1px solid #333;
+    border-bottom: none;
     color: #888;
     cursor: pointer;
-    border-radius: 5px 5px 0 0;
+    border-radius: 8px 8px 0 0;
     transition: all 0.2s;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+.tab-btn:hover {
+    background: linear-gradient(180deg, #333, #222);
+    color: #aaa;
 }
 .tab-btn.active {
-    background: #444;
+    background: linear-gradient(180deg, #444, #333);
     color: #fff;
     font-weight: bold;
+    border-color: #555;
     border-bottom: 2px solid var(--accent);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
 }
 .tab-content {
     display: none;
@@ -391,9 +399,25 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-dungeon { background: linear-gradient(to right, #e65100, #ff9800); }
 .btn-dungeon.active { background: linear-gradient(to right, #bf360c, #d84315); border: 2px solid #ffab91; }
 
+/* Law Cultivation Theme (Cyan) */
 .btn-cultivate { background: linear-gradient(to right, #006064, #00bcd4); }
 .btn-cultivate-all { background: linear-gradient(to right, #004d40, #00695c); font-size: 0.9rem; }
+
+/* Tower Theme (Indigo) */
+.btn-tower { background: linear-gradient(to right, #1a237e, #3f51b5); }
+.btn-tower.active { background: linear-gradient(to right, #b71c1c, #f44336); border-color: #ff5252; }
+
+/* Dungeon Theme (Orange) */
+.btn-dungeon { background: linear-gradient(to right, #e65100, #ff9800); }
+.btn-dungeon.active { background: linear-gradient(to right, #bf360c, #d84315); border: 2px solid #ffab91; }
+
+/* Treasure Theme (Purple) */
 .btn-treasure { background: linear-gradient(to right, #4a148c, #7b1fa2); }
+
+/* Realm Theme (Gold) */
+.btn-realm { background: linear-gradient(to right, #f57f17, #ffb300); color: #000; }
+.btn-realm:disabled { background: #333; color: #666; }
+.btn-realm.active { background: linear-gradient(to right, #ffd700, #ff8c00); color: #000; border: 2px solid #fff; box-shadow: 0 0 15px #ffd700; }
 
 .res-display {
     font-size: 1.1rem;
@@ -567,4 +591,81 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     .combat-scene { min-height: 300px; }
     .enemy-container { grid-template-columns: repeat(5, 1fr); }
     .treasure-layout { grid-template-columns: 1fr; }
+}
+
+/* Dungeon Tier Buttons */
+.tier-btn {
+    transition: all 0.2s ease;
+    font-weight: bold;
+    font-size: 0.8rem;
+}
+
+.tier-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 8px rgba(230, 81, 0, 0.5);
+}
+
+.tier-btn:disabled {
+    opacity: 0.5;
+}
+
+.tier-btn.active {
+    box-shadow: 0 0 10px #e65100;
+    border: 1px solid #ff9800 !important;
+}
+
+/* Realm Breakthrough System */
+.realm-boss-entity {
+    background: radial-gradient(circle, #ffd700, #b8860b);
+    border: 3px solid #fff;
+    width: 100px; height: 100px; font-size: 3rem;
+    box-shadow: 0 0 40px #ffd700, 0 0 80px #ff8c00;
+    z-index: 15;
+    animation: realm-boss-pulse 1.5s infinite;
+    margin-top: -20px;
+}
+
+@keyframes realm-boss-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 30px #ffd700, 0 0 60px #ff8c00; }
+    50% { transform: scale(1.08); box-shadow: 0 0 50px #ffd700, 0 0 100px #ff8c00; }
+    100% { transform: scale(1); box-shadow: 0 0 30px #ffd700, 0 0 60px #ff8c00; }
+}
+
+.realm-btn {
+    background: linear-gradient(45deg, #ffd700, #ff8c00);
+    border: 1px solid #fff;
+    color: #000;
+    font-weight: bold;
+    padding: 5px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    box-shadow: 0 0 10px #ffd700;
+    animation: realm-glow 2s infinite;
+}
+
+.realm-btn:disabled {
+    background: #555;
+    border-color: #777;
+    color: #999;
+    box-shadow: none;
+    animation: none;
+    cursor: not-allowed;
+}
+
+@keyframes realm-glow {
+    0% { box-shadow: 0 0 5px #ffd700; }
+    50% { box-shadow: 0 0 20px #ff8c00, 0 0 40px #ffd700; }
+    100% { box-shadow: 0 0 5px #ffd700; }
+}
+
+.difficulty-badge.realm-ready {
+    border-color: #ffd700;
+    box-shadow: 0 0 10px #ffd700;
+    animation: realm-ready-pulse 1.5s infinite;
+}
+
+@keyframes realm-ready-pulse {
+    0% { border-color: #ffd700; box-shadow: 0 0 5px #ffd700; }
+    50% { border-color: #ff8c00; box-shadow: 0 0 15px #ff8c00; }
+    100% { border-color: #ffd700; box-shadow: 0 0 5px #ffd700; }
 }

@@ -33,6 +33,8 @@ function getWeightedRandom(items, weightKey = 'weight') {
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { formatNum, getWeightedRandom };
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = { formatNum, getWeightedRandom };
+    }
+} catch (e) {}

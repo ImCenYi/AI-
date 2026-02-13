@@ -25,6 +25,7 @@
         <div class="stat-row"><span>暴击率:</span> <span id="stat-crit" class="val">0%</span></div>
         
         <div class="panel-title" style="margin-top:10px;">加成统计</div>
+        <div class="stat-row"><span>境界加成:</span> <span id="mul-realm" class="val">x1.00</span></div>
         <div class="stat-row"><span>法则倍率:</span> <span id="mul-atk" class="val">100%</span> (攻/血)</div>
         <div class="stat-row"><span>通天塔掉率:</span> <span id="mul-drop" class="val">0%</span></div>
         <div class="stat-row"><span>秘宝加成:</span> <span id="bonus-treasure" class="val" style="font-size:0.8rem">无</span></div>
@@ -82,16 +83,17 @@
         <div class="panel-title">游戏系统</div>
         
         <div class="tabs">
-            <button class="tab-btn active" onclick="game.switchTab('law')">法则修炼</button>
-            <button class="tab-btn" onclick="game.switchTab('tower')">通天塔</button>
-            <button class="tab-btn" onclick="game.switchTab('dungeon')">副本挑战</button>
-            <button class="tab-btn" onclick="game.switchTab('treasure')">秘宝系统</button>
+            <button class="tab-btn active" onclick="game.switchTab('law')">☯️ 法则悟道</button>
+            <button class="tab-btn" onclick="game.switchTab('dungeon')">🔥 副本探险</button>
+            <button class="tab-btn" onclick="game.switchTab('realm')">✨ 境界突破</button>
         </div>
 
-        <!-- Law Cultivation Tab -->
+        <!-- Law Cultivation Tab (法则悟道 - 合并法则修炼+通天塔) -->
         <div id="tab-law" class="tab-content active">
-            <div class="res-display">法则真意: <span id="res-law">0</span></div>
+            <!-- 上部：法则修炼 -->
             <div class="system-section">
+                <div class="res-display" style="border:none; color:#00bcd4;">📿 法则修炼</div>
+                <div class="res-display">法则真意: <span id="res-law">0</span></div>
                 <div class="sub-stat">当前轮次: <span id="cult-round" class="val">0</span></div>
                 <div class="sub-stat">修炼进度: <span id="cult-step" class="val">0 / 10</span></div>
                 <div class="sub-stat">下次加成: <span id="cult-next" class="highlight">攻击 +10%</span></div>
@@ -101,48 +103,80 @@
                     <button class="sys-btn btn-cultivate-all" onclick="game.cultivateAll()">⚡ 一键感悟</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Tower Tab -->
-        <div id="tab-tower" class="tab-content">
-            <div class="system-section">
-                <div class="res-display" style="border:none; color:#3f51b5;">通天塔</div>
+            
+            <!-- 下部：通天塔 -->
+            <div class="system-section" style="margin-top:10px;">
+                <div class="res-display" style="border:none; color:#3f51b5;">🗼 通天塔</div>
                 <div class="sub-stat">当前层数: <span id="tower-lv" class="val">0</span></div>
                 <div class="sub-stat">怪物强度: <span class="highlight">10^层数</span> (极难)</div>
                 <div class="sub-stat">掉落真意: <span id="tower-drop">1</span></div>
                 <button class="sys-btn btn-tower" id="btn-tower-toggle" onclick="game.toggleTowerMode()">🗼 挑战通天塔</button>
-            </div>
-        </div>
-
-        <!-- Dungeon Tab -->
-        <div id="tab-dungeon" class="tab-content">
-            <div class="system-section">
-                <div class="res-display" style="border:none; color:#e65100;">血色副本</div>
-                <div class="sub-stat">副本难度: <span id="dungeon-lv" class="val">1</span></div>
-                <div class="sub-stat">当前进度: <span id="dungeon-status">未开启</span></div>
-                <div class="sub-stat">自动倒计时: <span id="dungeon-timer">--</span></div>
-                <button class="sys-btn btn-dungeon" id="btn-dungeon-toggle" onclick="game.toggleDungeonMode()">🔥 进入副本</button>
                 <div style="font-size:0.7rem; color:#888; margin-top:5px;">
-                    * 伤害数值压缩: (log伤害)^2。<br>
-                    * 波次机制: 3波敌人，波次内延迟刷新。<br>
-                    * 通关获得秘宝开启资格。<br>
-                    * 死亡15s复活，30s自动下一轮。
+                    * 挑战通天塔可获得法则真意<br>
+                    * 每10层法则掉率翻倍
                 </div>
             </div>
         </div>
 
-        <!-- Treasure Tab (Summary) -->
-        <div id="tab-treasure" class="tab-content">
+        <!-- Dungeon & Treasure Tab (副本探险 - 合并副本+秘宝) -->
+        <div id="tab-dungeon" class="tab-content">
+            <!-- 上部：副本挑战 -->
             <div class="system-section">
-                <div class="res-display" style="border:none; color:#7b1fa2;">秘宝阁</div>
+                <div class="res-display" style="border:none; color:#e65100;">🔥 血色副本</div>
+                <div class="sub-stat">当前层数: <span id="dungeon-tier" class="val">T1</span></div>
+                <div class="sub-stat">副本难度: <span id="dungeon-lv" class="val">1</span></div>
+                <div class="sub-stat">当前进度: <span id="dungeon-status">未开启</span></div>
+                <div class="sub-stat">自动倒计时: <span id="dungeon-timer">--</span></div>
+                
+                <!-- 层数选择 -->
+                <div style="margin: 10px 0; padding: 8px; background: #1a1a1a; border-radius: 5px;">
+                    <div style="font-size: 0.75rem; color: #888; margin-bottom: 5px;">选择层数 (点击切换):</div>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button id="dungeon-tier-1" class="tier-btn" onclick="game.dungeon.setTier(1)" style="flex: 1; padding: 5px; background: #e65100; border: none; color: white; border-radius: 3px; cursor: pointer;">T1</button>
+                        <button id="dungeon-tier-2" class="tier-btn" onclick="game.dungeon.setTier(2)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T2🔒</button>
+                        <button id="dungeon-tier-3" class="tier-btn" onclick="game.dungeon.setTier(3)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T3🔒</button>
+                        <button id="dungeon-tier-4" class="tier-btn" onclick="game.dungeon.setTier(4)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T4🔒</button>
+                        <button id="dungeon-tier-5" class="tier-btn" onclick="game.dungeon.setTier(5)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T5🔒</button>
+                    </div>
+                    <div id="dungeon-unlock-hint" style="font-size: 0.7rem; color: #ff9800; margin-top: 5px;"></div>
+                </div>
+                
+                <button class="sys-btn btn-dungeon" id="btn-dungeon-toggle" onclick="game.toggleDungeonMode()">🔥 进入副本</button>
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 伤害数值压缩: (log伤害)^2。<br>
+                    * 通关获得秘宝宝箱与碎片。
+                </div>
+            </div>
+            
+            <!-- 下部：秘宝系统 -->
+            <div class="system-section" style="margin-top:10px;">
+                <div class="res-display" style="border:none; color:#7b1fa2;">🏺 秘宝阁</div>
                 <div class="sub-stat">待开宝箱: <span id="chest-count" class="highlight">0</span></div>
                 <div class="sub-stat">剩余次数: <span id="treasure-daily">20 / 20</span></div>
                 <div class="sub-stat">秘宝碎片: <span id="treasure-frags">0</span></div>
                 <button class="sys-btn btn-treasure" onclick="game.openTreasureModal()">🚪 进入秘宝阁</button>
                 <div style="font-size:0.7rem; color:#888; margin-top:5px;">
-                    * 通关副本获得宝箱。<br>
-                    * 每日20次开启限制。<br>
-                    * 提供强力指数级词条。
+                    * 通关副本获得宝箱<br>
+                    * 每日20次开启限制
+                </div>
+            </div>
+        </div>
+
+        <!-- Realm Breakthrough Tab (境界突破 - 独立标签) -->
+        <div id="tab-realm" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#ffd700;">✨ 境界突破</div>
+                <div class="sub-stat">当前境界: <span id="realm-name" class="val highlight">凡人-武者</span></div>
+                <div class="sub-stat">境界加成: <span id="realm-bonus" class="val">x1.00</span> (全属性)</div>
+                <div class="sub-stat">下一境界: <span id="next-realm" class="val">练气-初期</span></div>
+                <div class="sub-stat">突破需求: 历史最高难度达到 <span id="realm-req" class="val highlight">N4</span></div>
+                <div class="sub-stat">当前进度: <span id="realm-progress" class="val">1/4 (25%)</span></div>
+                
+                <button class="sys-btn btn-realm" id="btn-realm-challenge" onclick="game.summonRealmBoss()" disabled>🔒 难度不足</button>
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 达到指定难度后可挑战境界天劫<br>
+                    * 击败天劫BOSS即可突破境界<br>
+                    * 突破后获得全属性加成
                 </div>
             </div>
         </div>
@@ -223,6 +257,8 @@
             <option value="chest">增加秘宝宝箱</option>
             <option value="frag">增加秘宝碎片</option>
             <option value="ticket">增加秘宝次数</option>
+            <option value="realm">增加境界等级</option>
+            <option value="diff">增加历史最高难度</option>
         </select>
         <input type="text" id="cheat-val" class="cheat-input" placeholder="输入数值 (支持 1e100)">
         <div style="font-size:0.8rem; color:#888;">支持极大数值，输入过大将变为∞</div>

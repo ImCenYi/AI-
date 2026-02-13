@@ -70,15 +70,158 @@ const DUNGEON_TYPES = [
 ];
 const DUNGEON_N1_MULT = 33; 
 const DUNGEON_ATK_INC = 100; 
-const DUNGEON_HP_INC = 100; 
+const DUNGEON_HP_INC = 100;
 
-// Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        SCALE_ENEMY, SCALE_EQUIP, SCALE_PILL, SCALE_TOWER_STR, SCALE_TOWER_DROP,
-        SLOTS_CONFIG, SLOT_KEYS,
-        TREASURE_SLOTS, TREASURE_QUALITIES, TREASURE_ATTRS,
-        QUALITIES, ENEMY_TYPES, TOWER_TYPES,
-        DUNGEON_TYPES, DUNGEON_N1_MULT, DUNGEON_ATK_INC, DUNGEON_HP_INC
+// Dungeon Unlock Requirements
+// T1: N100, T2: N300, T3: N600, T4: N900... TX: N300*(X-1) for X>=2
+function getDungeonUnlockRequirement(tier) {
+    if (tier <= 0) return 0;
+    if (tier === 1) return 100;
+    return 300 * (tier - 1);
+}
+
+const MAX_DUNGEON_TIER = 5; // 最大副本层数 T1-T5
+
+// Realm Breakthrough Configuration (境界突破)
+const REALM_TABLE = [
+    ['凡人-武者', 1],
+    ['练气-初期', 4],
+    ['练气-中期', 6],
+    ['练气-后期', 12],
+    ['练气-圆满', 22],
+    ['筑基-初期', 36],
+    ['筑基-中期', 54],
+    ['筑基-后期', 75],
+    ['筑基-圆满', 101],
+    ['结丹-初期', 131],
+    ['结丹-中期', 165],
+    ['结丹-后期', 202],
+    ['结丹-圆满', 244],
+    ['元婴-初期', 290],
+    ['元婴-中期', 339],
+    ['元婴-后期', 393],
+    ['元婴-圆满', 450],
+    ['化神-初期', 512],
+    ['化神-中期', 577],
+    ['化神-后期', 646],
+    ['化神-圆满', 720],
+    ['洞虚-初期', 797],
+    ['洞虚-中期', 878],
+    ['洞虚-后期', 964],
+    ['洞虚-圆满', 1053],
+    ['合体-初期', 1146],
+    ['合体-中期', 1243],
+    ['合体-后期', 1344],
+    ['合体-圆满', 1450],
+    ['渡劫-初期', 1559],
+    ['渡劫-中期', 1672],
+    ['渡劫-后期', 1789],
+    ['渡劫-圆满', 1910],
+    ['大乘-初期', 2035],
+    ['大乘-中期', 2163],
+    ['大乘-后期', 2296],
+    ['大乘-圆满', 2433],
+    ['地仙-初期', 2574],
+    ['地仙-中期', 2719],
+    ['地仙-后期', 2867],
+    ['地仙-圆满', 3020],
+    ['真仙-初期', 3177],
+    ['真仙-中期', 3337],
+    ['真仙-后期', 3502],
+    ['真仙-圆满', 3670],
+    ['金仙-初期', 3843],
+    ['金仙-中期', 4019],
+    ['金仙-后期', 4200],
+    ['金仙-圆满', 4384],
+    ['太乙玄仙-初期', 4573],
+    ['太乙玄仙-中期', 4765],
+    ['太乙玄仙-后期', 4961],
+    ['太乙玄仙-圆满', 5162],
+    ['大罗金仙-初期', 5366],
+    ['大罗金仙-中期', 5574],
+    ['大罗金仙-后期', 5786],
+    ['大罗金仙-圆满', 6002],
+    ['道祖-初期', 6223],
+    ['道祖-中期', 6447],
+    ['道祖-后期', 6675],
+    ['道祖-圆满', 6907],
+    ['至尊道祖-初期', 7143],
+    ['至尊道祖-中期', 7383],
+    ['至尊道祖-后期', 7626],
+    ['至尊道祖-圆满', 7874],
+    ['半神-初期', 8126],
+    ['半神-中期', 8382],
+    ['半神-后期', 8642],
+    ['半神-圆满', 8905],
+    ['真神-初期', 9173],
+    ['真神-中期', 9445],
+    ['真神-后期', 9720],
+    ['真神-圆满', 10000],
+    ['界神-初期', 10284],
+    ['界神-中期', 10571],
+    ['界神-后期', 10863],
+    ['界神-圆满', 11158],
+    ['寰宇神尊-初期', 11457],
+    ['寰宇神尊-中期', 11761],
+    ['寰宇神尊-后期', 12068],
+    ['寰宇神尊-圆满', 12380],
+    ['永恒真神-初期', 12695],
+    ['永恒真神-中期', 13014],
+    ['永恒真神-后期', 13337],
+    ['永恒真神-圆满', 13665],
+    ['混沌主宰-初期', 13996],
+    ['混沌主宰-中期', 14331],
+    ['混沌主宰-后期', 14670],
+    ['混沌主宰-圆满', 15013],
+    ['神王-初期', 15360],
+    ['神王-中期', 15711],
+    ['神王-后期', 16066],
+    ['神王-圆满', 16425],
+    ['神帝-初期', 16788],
+    ['神帝-中期', 17155],
+    ['神帝-后期', 17525],
+    ['神帝-圆满', 17900],
+    ['无上至尊——1境', 18279]
+];
+
+function getRealmInfo(index) {
+    if (index < REALM_TABLE.length) {
+        return { name: REALM_TABLE[index][0], requiredDifficulty: REALM_TABLE[index][1] };
+    }
+    // Dynamic 无上至尊 tiers beyond index 97
+    const tier = index - 97 + 1; // index 98 = 2境, index 99 = 3境, ...
+    return {
+        name: `无上至尊——${tier}境`,
+        requiredDifficulty: 18279 + (tier - 1) * 10000
     };
 }
+
+function getRealmBonus(realmIndex) {
+    if (realmIndex <= 0) return new BigNum(1);
+    return new BigNum(1.05).pow(realmIndex);
+}
+
+// Realm Boss Constants
+const REALM_BOSS_ATK_BASE = 50;
+const REALM_BOSS_HP_BASE = 2000;
+const REALM_BOSS_EMOJI = '🐉';
+
+// Realm Boss Strength Multiplier (compared to normal boss at same difficulty)
+const REALM_BOSS_MULT = 2.5;
+
+// Realm Bonus Growth
+const REALM_BONUS_BASE = 1.1;  // 10% per realm level
+const REALM_BONUS_EXPONENT = 1.05; // exponential growth
+
+// Export for module systems if needed
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            SCALE_ENEMY, SCALE_EQUIP, SCALE_PILL, SCALE_TOWER_STR, SCALE_TOWER_DROP,
+            SLOTS_CONFIG, SLOT_KEYS,
+            TREASURE_SLOTS, TREASURE_QUALITIES, TREASURE_ATTRS,
+            QUALITIES, ENEMY_TYPES, TOWER_TYPES,
+            DUNGEON_TYPES, DUNGEON_N1_MULT, DUNGEON_ATK_INC, DUNGEON_HP_INC
+        };
+    }
+} catch (e) {}

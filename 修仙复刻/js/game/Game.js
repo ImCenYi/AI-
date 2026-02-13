@@ -29,6 +29,12 @@ class Game {
         this.towerLevel = 0;
         this.dungeon = new Dungeon(this);
         
+        // Realm System (境界系统)
+        this.realmIndex = 0;  // Current realm level
+        this.maxDifficulty = 1; // Historical max difficulty
+        this.realmBossActive = false; // Is realm boss currently spawned
+        this.realmBossKilled = false; // Has realm boss been killed this difficulty
+        
         this.isDead = false;
         this.lastTick = Date.now();
         this.autoChallenge = false;
@@ -36,6 +42,7 @@ class Game {
         
         this.initUI();
         this.spawnWildWave();
+        this.updateRealmUI(); // Initialize realm UI
         this.loop();
     }
 
@@ -53,6 +60,7 @@ class Game {
         this.updateStatsUI();
         this.updateSystemUI();
         this.updateTreasureUI();
+        this.dungeon.updateUI();
     }
 
     getIcon(slot) {
@@ -91,17 +99,158 @@ class Game {
         }
         stats.atk = stats.atk.mul(tMult);
         maxHp = maxHp.mul(tMult);
+        
+        // Apply realm bonus
+        const realmBonus = this.getRealmBonus();
+        stats.atk = stats.atk.mul(realmBonus);
+        maxHp = maxHp.mul(realmBonus);
 
         return { ...stats, maxHp };
+    }
+
+    // --- Realm System (境界系统) ---
+    getCurrentRealm() {
+        return getRealmInfo(this.realmIndex);
+    }
+
+    getNextRealm() {
+        return getRealmInfo(this.realmIndex + 1);
+    }
+
+    getRealmBonus() {
+        // Each realm level gives 10% bonus, compounded
+        return new BigNum(REALM_BONUS_BASE).pow(this.realmIndex);
+    }
+
+    canBreakthrough() {
+        const nextRealm = this.getNextRealm();
+        // Check if we've reached the required difficulty and haven't already killed the boss
+        return this.maxDifficulty >= nextRealm.requiredDifficulty && !this.realmBossKilled;
+    }
+
+    isRealmBossAlive() {
+        return this.enemies.some(e => e.isRealmBoss);
+    }
+
+    summonRealmBoss() {
+        if (this.isRealmBossAlive()) return;
+        if (this.mode !== 'wild') {
+            this.log('SYS', '只能在荒野模式挑战境界天劫！');
+            return;
+        }
+        if (!this.canBreakthrough()) {
+            this.log('SYS', '尚未满足境界突破条件！');
+            return;
+        }
+        
+        const nextRealm = this.getNextRealm();
+        const difficulty = nextRealm.requiredDifficulty;
+        
+        // Realm boss uses the target difficulty's scale, multiplied by REALM_BOSS_MULT
+        const scale = new BigNum(SCALE_ENEMY).pow(difficulty).mul(REALM_BOSS_MULT);
+        
+        this.enemies.push({
+            id: `realm-boss-${Date.now()}`,
+            name: `${nextRealm.name}·天劫`,
+            maxHp: new BigNum(REALM_BOSS_HP_BASE).mul(scale),
+            currentHp: new BigNum(REALM_BOSS_HP_BASE).mul(scale),
+            atk: new BigNum(REALM_BOSS_ATK_BASE).mul(scale),
+            isBoss: true,  // Treat as boss for some mechanics
+            isRealmBoss: true,  // Special flag for realm boss
+            emoji: REALM_BOSS_EMOJI
+        });
+        
+        this.realmBossActive = true;
+        this.log('SYS', `☯️ 境界天劫降临！击败${nextRealm.name}天劫即可突破！`);
+        this.updateCombatUI(true);
+        this.updateRealmUI();
+    }
+
+    handleRealmBossKill() {
+        this.realmBossKilled = true;
+        this.realmBossActive = false;
+        this.realmIndex++;
+        
+        const currentRealm = this.getCurrentRealm();
+        const bonus = this.getRealmBonus();
+        
+        this.log('GAIN', `🎉 境界突破成功！当前境界：${currentRealm.name}`);
+        this.log('GAIN', `✨ 境界加成：全属性 x${formatNum(bonus)}`);
+        
+        // Check if next realm is immediately available (for multi-breakthrough)
+        this.checkAndResetRealmBossKilled();
+        
+        this.updateRealmUI();
+        this.updateStatsUI();
+    }
+
+    checkAndResetRealmBossKilled() {
+        // Reset the killed flag if player can immediately breakthrough again
+        const nextRealm = this.getNextRealm();
+        if (this.maxDifficulty >= nextRealm.requiredDifficulty) {
+            this.realmBossKilled = false;
+        }
+    }
+
+    updateRealmUI() {
+        const currentRealm = this.getCurrentRealm();
+        const nextRealm = this.getNextRealm();
+        const canBreak = this.canBreakthrough();
+        const bonus = this.getRealmBonus();
+        
+        // Update header display
+        const levelDisplay = document.getElementById('level-display');
+        if (levelDisplay) {
+            levelDisplay.innerText = `荒野层数: ${this.difficulty} (${currentRealm.name})`;
+        }
+        
+        // Update realm panel if elements exist
+        const realmNameEl = document.getElementById('realm-name');
+        const realmBonusEl = document.getElementById('realm-bonus');
+        const nextRealmEl = document.getElementById('next-realm');
+        const realmReqEl = document.getElementById('realm-req');
+        const realmProgressEl = document.getElementById('realm-progress');
+        const realmBtn = document.getElementById('btn-realm-challenge');
+        
+        if (realmNameEl) realmNameEl.innerText = currentRealm.name;
+        if (realmBonusEl) realmBonusEl.innerText = `x${formatNum(bonus)}`;
+        if (nextRealmEl) nextRealmEl.innerText = nextRealm.name;
+        if (realmReqEl) realmReqEl.innerText = `N${nextRealm.requiredDifficulty}`;
+        
+        if (realmProgressEl) {
+            const progress = Math.min(100, Math.floor((this.maxDifficulty / nextRealm.requiredDifficulty) * 100));
+            realmProgressEl.innerText = `${this.maxDifficulty}/${nextRealm.requiredDifficulty} (${progress}%)`;
+        }
+        
+        if (realmBtn) {
+            if (this.isRealmBossAlive()) {
+                realmBtn.innerText = '⚔️ 天劫战斗中...';
+                realmBtn.classList.add('active');
+                realmBtn.disabled = false;
+            } else if (canBreak) {
+                realmBtn.innerText = '☯️ 挑战境界天劫';
+                realmBtn.classList.remove('active');
+                realmBtn.disabled = false;
+            } else {
+                realmBtn.innerText = this.realmBossKilled ? '✅ 可继续突破' : '🔒 难度不足';
+                realmBtn.classList.remove('active');
+                realmBtn.disabled = true;
+            }
+        }
     }
 
     // --- Mode ---
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','tower','dungeon','treasure'].indexOf(tab);
+        const btnIdx = ['law','dungeon','realm'].indexOf(tab);
         document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
+        
+        // Update realm UI when switching to realm tab
+        if (tab === 'realm') {
+            this.updateRealmUI();
+        }
     }
 
     toggleTowerMode() { this.changeMode('tower'); }
@@ -119,7 +268,15 @@ class Game {
             this.mode = newMode;
             if (newMode === 'tower') this.log('SYS', '进入通天塔！');
             if (newMode === 'dungeon') {
-                this.log('SYS', '进入血色副本！伤害已被压缩。');
+                // 检查副本是否已解锁
+                if (!this.dungeon.isUnlocked(this.dungeon.tier)) {
+                    const required = getDungeonUnlockRequirement(this.dungeon.tier);
+                    this.log('SYS', `🔒 副本T${this.dungeon.tier}需主线N${required}解锁！当前N${this.difficulty}`);
+                    this.mode = 'wild';
+                    this.updateButtons();
+                    return;
+                }
+                this.log('SYS', `进入血色副本T${this.dungeon.tier}！伤害已被压缩。`);
                 this.dungeon.start();
             }
         }
@@ -149,7 +306,8 @@ class Game {
             stage.innerText = `通天塔 - 第 ${this.towerLevel} 层`;
         } else {
             btnBoss.style.display = 'none';
-            stage.innerText = `副本 - 难度 ${this.dungeon.level}`;
+            const tierInfo = this.dungeon.isUnlocked(this.dungeon.tier) ? `T${this.dungeon.tier}` : `🔒T${this.dungeon.tier}`;
+            stage.innerText = `副本${tierInfo} - 难度 ${this.dungeon.level}`;
         }
 
         // 2. Override text if auto is active
@@ -256,6 +414,12 @@ class Game {
     }
 
     handleKill(enemy) {
+        // Check if it's a realm boss
+        if (enemy.isRealmBoss) {
+            this.handleRealmBossKill();
+            return;
+        }
+        
         if (this.mode === 'tower') {
             if (enemy.isBoss) {
                 this.towerLevel++;
@@ -269,10 +433,27 @@ class Game {
         } else if (this.mode === 'wild') {
             if (enemy.isBoss) {
                 this.difficulty++;
+                // Update historical max difficulty
+                if (this.difficulty > this.maxDifficulty) {
+                    this.maxDifficulty = this.difficulty;
+                    // Check if we can unlock realm breakthrough
+                    this.checkAndResetRealmBossKilled();
+                    this.updateRealmUI();
+                }
                 this.lastBossDeathTime = Date.now();
                 this.log('GAIN', '击败BOSS！难度+1');
+                
+                // 检查是否解锁了新的副本层数
+                const prevMaxTier = this.dungeon.getMaxUnlockedTier();
+                const newMaxTier = Math.floor(this.difficulty / 300) + (this.difficulty >= 100 ? 1 : 0);
+                if (this.difficulty === 100 || (this.difficulty > 300 && this.difficulty % 300 === 0)) {
+                    const unlockedTier = this.dungeon.getMaxUnlockedTier();
+                    this.log('SYS', `🎉 解锁副本T${unlockedTier}！当前主线N${this.difficulty}`);
+                }
+                
                 this.rollWildLoot(true);
                 this.updateButtons();
+                this.dungeon.updateUI(); // 更新副本解锁状态显示
             } else {
                 this.rollWildLoot(false);
             }
@@ -323,6 +504,12 @@ class Game {
             this.dungeon.start(); 
         } else {
             this.spawnWildWave();
+        }
+        
+        // Restore realm boss if it was active
+        if (this.realmBossActive && !this.isRealmBossAlive()) {
+            this.realmBossActive = false;
+            this.updateRealmUI();
         }
     }
 
@@ -615,6 +802,17 @@ class Game {
                 this.treasureDaily += val.toNumber();
                 this.log('SYS', `金手指: 秘宝次数 +${formatNum(val)}`);
                 break;
+            case 'realm':
+                this.realmIndex += val.toNumber();
+                this.log('SYS', `金手指: 境界等级 +${formatNum(val)}，当前境界：${this.getCurrentRealm().name}`);
+                this.updateRealmUI();
+                break;
+            case 'diff':
+                this.maxDifficulty += val.toNumber();
+                this.log('SYS', `金手指: 历史最高难度 +${formatNum(val)}`);
+                this.checkAndResetRealmBossKilled();
+                this.updateRealmUI();
+                break;
         }
         
         this.updateStatsUI();
@@ -784,9 +982,55 @@ class Game {
         setVal('tower-lv', this.towerLevel);
         setVal('tower-drop', formatNum(new BigNum(SCALE_TOWER_DROP).pow(this.towerLevel)));
         
-        setVal('dungeon-lv', this.difficulty);
-        setVal('dungeon-status', this.dungeon.active ? `波次 ${Math.min(this.dungeon.wave+1, 3)}/3` : "待机");
+        setVal('dungeon-lv', this.dungeon.level);
+        setVal('dungeon-tier', `T${this.dungeon.tier}`);
+        
+        // 更新副本状态显示
+        const dungeonStatusEl = document.getElementById('dungeon-status');
+        if (dungeonStatusEl) {
+            if (!this.dungeon.isUnlocked(this.dungeon.tier)) {
+                dungeonStatusEl.innerText = `🔒 需主线N${getDungeonUnlockRequirement(this.dungeon.tier)}`;
+            } else {
+                dungeonStatusEl.innerText = this.dungeon.active ? `波次 ${Math.min(this.dungeon.wave+1, 3)}/3` : "待机";
+            }
+        }
+        
         if(document.getElementById('dungeon-timer')) document.getElementById('dungeon-timer').innerText = this.dungeon.timeRemaining > 0 ? `${this.dungeon.timeRemaining}s` : "--";
+        
+        // 更新层数按钮状态和解锁提示
+        for (let t = 1; t <= MAX_DUNGEON_TIER; t++) {
+            const btn = document.getElementById(`dungeon-tier-${t}`);
+            if (btn) {
+                const unlocked = this.dungeon.isUnlocked(t);
+                const required = getDungeonUnlockRequirement(t);
+                btn.disabled = !unlocked;
+                if (unlocked) {
+                    btn.style.background = this.dungeon.tier === t ? '#e65100' : '#555';
+                    btn.style.color = 'white';
+                    btn.style.cursor = 'pointer';
+                    btn.innerText = `T${t}`;
+                } else {
+                    btn.style.background = '#222';
+                    btn.style.color = '#555';
+                    btn.style.cursor = 'not-allowed';
+                    btn.innerText = `T${t}🔒`;
+                }
+            }
+        }
+        
+        // 更新解锁提示
+        const hintEl = document.getElementById('dungeon-unlock-hint');
+        if (hintEl) {
+            const maxUnlocked = this.dungeon.getMaxUnlockedTier();
+            const nextUnlock = this.dungeon.getNextUnlockRequirement();
+            if (nextUnlock) {
+                const nextTier = maxUnlocked + 1;
+                const progress = Math.min(100, Math.floor((this.difficulty / nextUnlock) * 100));
+                hintEl.innerHTML = `T${nextTier}解锁进度: N${this.difficulty}/${nextUnlock} (${progress}%)`;
+            } else {
+                hintEl.innerHTML = `✅ 已解锁全部层数！`;
+            }
+        }
         
         setVal('treasure-daily', `${this.treasureDaily}/${this.treasureLimit}`);
         setVal('treasure-frags', formatNum(this.treasureFragments));
@@ -803,6 +1047,12 @@ class Game {
         document.getElementById('stat-hp').innerText = `${formatNum(cur)} / ${formatNum(s.maxHp)}`;
         document.getElementById('stat-atk').innerText = formatNum(s.atk);
         if(document.getElementById('stat-crit')) document.getElementById('stat-crit').innerText = s.crit + '%';
+        
+        // Realm Multiplier
+        const realmBonus = this.getRealmBonus();
+        if (document.getElementById('mul-realm')) {
+            document.getElementById('mul-realm').innerText = `x${formatNum(realmBonus)}`;
+        }
         
         // Multipliers
         const atkMul = this.lawMultipliers.atk.mul(100).toString() + '%';
@@ -829,7 +1079,16 @@ class Game {
             c.innerHTML = '';
             this.enemies.forEach(e => {
                 const el = document.createElement('div');
-                el.className = `entity ${e.isBoss?'boss-entity':'enemy-entity'}`;
+                // Add special class for realm boss
+                let className = 'entity';
+                if (e.isRealmBoss) {
+                    className += ' realm-boss-entity';
+                } else if (e.isBoss) {
+                    className += ' boss-entity';
+                } else {
+                    className += ' enemy-entity';
+                }
+                el.className = className;
                 el.id = `e-${e.id}`;
                 
                 let hpPct = 100;
@@ -894,6 +1153,8 @@ class Game {
 }
 
 // Export for module systems if needed
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Game;
-}
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = Game;
+    }
+} catch (e) {}
