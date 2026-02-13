@@ -86,6 +86,7 @@
             <button class="tab-btn active" onclick="game.switchTab('law')">☯️ 法则悟道</button>
             <button class="tab-btn" onclick="game.switchTab('dungeon')">🔥 副本探险</button>
             <button class="tab-btn" onclick="game.switchTab('realm')">✨ 境界突破</button>
+            <button class="tab-btn" onclick="game.switchTab('garden')">🌿 百草灵园</button>
         </div>
 
         <!-- Law Cultivation Tab (法则悟道 - 合并法则修炼+通天塔) -->
@@ -180,6 +181,55 @@
                 </div>
             </div>
         </div>
+
+        <!-- Spirit Garden Tab (百草灵园 - 概览入口) -->
+        <div id="tab-garden" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#22c55e;">🌿 百草灵园</div>
+                
+                <!-- 等级和转数 -->
+                <div class="sub-stat">
+                    <span>灵植等级:</span>
+                    <span>Lv.<span id="garden-overview-level" class="val highlight">1</span> 
+                    (<span id="garden-overview-turn">凡阶</span>)</span>
+                </div>
+                
+                <!-- 灵石和收入 -->
+                <div class="sub-stat">
+                    <span>灵石储备:</span>
+                    <span id="garden-overview-stones" class="val">100</span>
+                </div>
+                <div class="sub-stat">
+                    <span>灵石收入:</span>
+                    <span id="garden-overview-income" class="val highlight" style="color:#22c55e;">+0/分</span>
+                </div>
+                <div class="sub-stat">
+                    <span>经验获取:</span>
+                    <span id="garden-overview-exp" class="val highlight" style="color:#3b82f6;">+0/分</span>
+                </div>
+                
+                <!-- 土地状态 -->
+                <div class="sub-stat">
+                    <span>已开垦:</span>
+                    <span><span id="garden-overview-lands">4</span>/16 块</span>
+                </div>
+                <div class="sub-stat">
+                    <span>可收获:</span>
+                    <span id="garden-overview-mature" class="val highlight" style="color:#fbbf24;">0</span>
+                </div>
+                
+                <!-- 进入灵植园按钮 -->
+                <button class="sys-btn btn-garden" onclick="game.openGardenModal()" style="margin-top:10px; background:linear-gradient(to right, #15803d, #22c55e);">
+                    <i class="fas fa-leaf"></i> 进入灵植园
+                </button>
+                
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 灵植自动生长，收获获得灵石<br>
+                    * 灵植经验自动转化为法则真意<br>
+                    * 傀儡托管自动收获和种植
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -245,6 +295,104 @@
     </div>
 </div>
 
+<!-- Garden Full Screen Modal -->
+<div id="garden-full-modal" class="game-modal" style="z-index: 1500;">
+    <div class="modal-content" style="width: 90%; max-width: 800px; height: 90%; display: flex; flex-direction: column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
+            <h2 style="margin:0; color:#22c55e;">🌿 百草灵园</h2>
+            <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeGardenModal()">✕</button>
+        </div>
+        
+        <div style="display:flex; gap:15px; flex:1; overflow:hidden;">
+            <!-- 左侧：灵植园主界面 -->
+            <div style="flex:2; display:flex; flex-direction:column; gap:10px; overflow:hidden;">
+                <!-- 状态栏 -->
+                <div style="background:#1a1a1a; padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:1.1rem; font-weight:bold; color:#22c55e;">
+                            Lv.<span id="garden-modal-level">1</span> 
+                            (<span id="garden-modal-turn">凡阶</span>)
+                        </div>
+                        <div style="width:150px; height:6px; background:#333; border-radius:3px; margin-top:5px; overflow:hidden;">
+                            <div id="garden-modal-exp-bar" style="width:0%; height:100%; background:linear-gradient(90deg, #22c55e, #16a34a);"></div>
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.2rem; color:#fbbf24; font-weight:bold;">
+                            💎 <span id="garden-modal-stones">100</span>
+                        </div>
+                        <div style="font-size:0.75rem; color:#888;">
+                            <span style="color:#22c55e;" id="garden-modal-income">+0/分</span> | 
+                            <span style="color:#3b82f6;" id="garden-modal-exp-rate">+0/分</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 土地网格 -->
+                <div style="flex:1; background:#1a1a1a; border-radius:8px; padding:10px; overflow-y:auto;">
+                    <div id="modal-land-grid" class="garden-land-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <!-- 由JS生成 -->
+                    </div>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:8px;">
+                    <button class="sys-btn" style="background:linear-gradient(to right, #15803d, #22c55e); font-size:0.8rem; padding:8px;" onclick="game.gardenOneClickHarvest()">
+                        <i class="fas fa-hand-holding-dollar"></i> 一键收获
+                    </button>
+                    <button class="sys-btn" style="background:linear-gradient(to right, #1d4ed8, #3b82f6); font-size:0.8rem; padding:8px;" onclick="game.gardenOneClickPlant()">
+                        <i class="fas fa-seedling"></i> 一键种植
+                    </button>
+                    <button class="sys-btn" style="background:linear-gradient(to right, #991b1b, #dc2626); font-size:0.8rem; padding:8px;" onclick="game.gardenOneClickClear()">
+                        <i class="fas fa-trash-alt"></i> 铲除未熟
+                    </button>
+                    <button id="modal-puppet-btn" class="sys-btn" style="background:linear-gradient(to right, #581c87, #9333ea); font-size:0.8rem; padding:8px; opacity:0.6;" onclick="game.togglePuppetMode()" disabled>
+                        <i class="fas fa-robot"></i> 傀儡
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 右侧：灵植阁 -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:10px; min-width:200px;">
+                <div style="background:#1a1a1a; padding:10px; border-radius:8px; flex:1; display:flex; flex-direction:column;">
+                    <h3 style="margin:0 0 10px 0; color:#16a34a; font-size:1rem;">🏪 灵植阁</h3>
+                    
+                    <!-- 转数选择器 -->
+                    <div style="padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid #333;">
+                        <label style="font-size:0.75rem; color:#9ca3af; margin-bottom:4px; display:block;">选择转数</label>
+                        <select id="modal-turn-selector" onchange="game.garden.setShopTurn(parseInt(this.value)); game.updateGardenUI();" style="width:100%; padding:6px; background:#262626; border:1px solid #4b5563; border-radius:4px; color:#fff; font-size:0.85rem;">
+                            <!-- 由JS生成 -->
+                        </select>
+                    </div>
+                    
+                    <!-- 工具栏 -->
+                    <div id="modal-shovel-btn" class="tool-btn" style="padding:8px; background:#374151; border-radius:6px; display:flex; align-items:center; gap:8px; border:1px solid #4b5563; margin-bottom:8px;">
+                        <span style="font-size:1.3rem;">⛏️</span>
+                        <div style="pointer-events:none;">
+                            <div style="font-size:0.85rem; color:#f87171; font-weight:bold;">玉灵铲</div>
+                            <div style="font-size:0.7rem; color:#9ca3af;">点击植物单体移除</div>
+                        </div>
+                    </div>
+                    
+                    <!-- 种子列表 -->
+                    <div id="modal-seed-list" style="flex:1; overflow-y:auto; background:#262626; border-radius:6px; padding:6px;">
+                        <!-- 由JS生成 -->
+                    </div>
+                    
+                    <!-- 丹火提炼 -->
+                    <div id="modal-alchemy-toggle" style="display:none; margin-top:8px; padding:8px; background:#262626; border-radius:6px; align-items:center; justify-content:space-between;">
+                        <div>
+                            <span style="color:#f97316;">🔥 丹火提炼</span>
+                            <span style="font-size:0.7rem; color:#888; margin-left:5px;">+20%收益</span>
+                        </div>
+                        <button id="modal-alchemy-btn" onclick="game.toggleAlchemyMode();" style="padding:4px 12px; background:#374151; border:none; border-radius:4px; color:#fff; font-size:0.75rem; cursor:pointer;">OFF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Cheat Modal -->
 <div id="cheat-modal" class="game-modal">
     <div class="modal-content">
@@ -259,6 +407,8 @@
             <option value="ticket">增加秘宝次数</option>
             <option value="realm">增加境界等级</option>
             <option value="diff">增加历史最高难度</option>
+            <option value="gardenExp">灵植经验倍率</option>
+            <option value="gardenStone">灵植灵石倍率</option>
         </select>
         <input type="text" id="cheat-val" class="cheat-input" placeholder="输入数值 (支持 1e100)">
         <div style="font-size:0.8rem; color:#888;">支持极大数值，输入过大将变为∞</div>
@@ -274,6 +424,7 @@
 <script src="js/classes/Item.js"></script>
 <script src="js/classes/Treasure.js"></script>
 <script src="js/classes/Dungeon.js"></script>
+<script src="js/classes/SpiritGarden.js"></script>
 <script src="js/game/Game.js"></script>
 
 <!-- Initialize Game -->

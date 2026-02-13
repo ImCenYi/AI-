@@ -213,6 +213,42 @@ const REALM_BOSS_MULT = 2.5;
 const REALM_BONUS_BASE = 1.1;  // 10% per realm level
 const REALM_BONUS_EXPONENT = 1.05; // exponential growth
 
+// Spirit Garden (百草灵园) Configuration
+const GARDEN_CONFIG = {
+    maxLands: 16,
+    initialLands: 4,
+    unlockCostBase: 200,
+    unlockCostGrowth: 2.5,
+    puppetUnlockLevel: 2,
+    alchemyUnlockLevel: 10,
+    alchemyBonus: 1.2,  // +20% income
+    expToLawRate: 0.1,  // 10% garden exp converts to law fragments
+    
+    // Turn names
+    turnNames: ['凡阶', '1转', '2转', '3转', '4转', '5转', '6转', '7转', '8转', '9转'],
+    
+    // Base crops (7 types × 10 turns = 70 crops)
+    baseCrops: [
+        { id: 1, name: '凝气草', quality: 0, icon: '🌿', time: 3,    cost: 10,     income: 15,      exp: 5,       reqLevel: 1 },
+        { id: 2, name: '血菩提', quality: 1, icon: '🍒', time: 10,   cost: 100,    income: 250,     exp: 25,      reqLevel: 3 },
+        { id: 3, name: '玄冰花', quality: 2, icon: '❄️', time: 30,   cost: 800,    income: 2400,    exp: 120,     reqLevel: 10 },
+        { id: 4, name: '紫金藤', quality: 3, icon: '🎋', time: 60,   cost: 3000,   income: 10000,   exp: 400,     reqLevel: 25 },
+        { id: 5, name: '龙鳞果', quality: 4, icon: '🐲', time: 120,  cost: 15000,  income: 60000,   exp: 1500,    reqLevel: 45 },
+        { id: 6, name: '悟道茶', quality: 5, icon: '🍵', time: 300,  cost: 80000,  income: 400000,  exp: 6000,    reqLevel: 65 },
+        { id: 7, name: '混沌莲', quality: 5, icon: '🪷', time: 600,  cost: 500000, income: 3000000, exp: 20000,   reqLevel: 80 },
+    ]
+};
+
+// Quality colors for garden crops
+const CROP_QUALITY_COLORS = [
+    '#9ca3af',  // 0 - gray
+    '#4ade80',  // 1 - green
+    '#60a5fa',  // 2 - blue
+    '#c084fc',  // 3 - purple
+    '#facc15',  // 4 - yellow
+    '#ef4444'   // 5 - red
+];
+
 // Export for module systems if needed
 try {
     if (typeof module !== 'undefined' && module.exports) {

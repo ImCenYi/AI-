@@ -35,6 +35,15 @@ class Game {
         this.realmBossActive = false; // Is realm boss currently spawned
         this.realmBossKilled = false; // Has realm boss been killed this difficulty
         
+        // Spirit Garden System (百草灵园)
+        this.garden = new SpiritGarden(this);
+        this.isGardenTabActive = false;
+        this.isGardenModalOpen = false;
+        
+        // Garden cheat multipliers
+        this.gardenExpMultiplier = 1;
+        this.gardenStoneMultiplier = 1;
+        
         this.isDead = false;
         this.lastTick = Date.now();
         this.autoChallenge = false;
@@ -243,13 +252,21 @@ class Game {
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','dungeon','realm'].indexOf(tab);
+        const btnIdx = ['law','dungeon','realm','garden'].indexOf(tab);
         document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
+        
+        // Update flags
+        this.isGardenTabActive = (tab === 'garden');
         
         // Update realm UI when switching to realm tab
         if (tab === 'realm') {
             this.updateRealmUI();
+        }
+        
+        // Update garden overview when switching to garden tab
+        if (tab === 'garden') {
+            this.updateGardenOverview();
         }
     }
 
@@ -338,6 +355,16 @@ class Game {
             if(this.currentHp.gt(stats.maxHp)) this.currentHp = stats.maxHp;
             this.updateCombatUI();
         }
+        
+        // Update spirit garden growth
+        if (this.garden) {
+            this.garden.updateGrowth();
+            // Real-time update progress bars only (not full UI)
+            if (this.isGardenModalOpen) {
+                this.updateGardenProgressBars();
+            }
+        }
+        
         requestAnimationFrame(() => this.loop());
     }
 
@@ -813,6 +840,14 @@ class Game {
                 this.checkAndResetRealmBossKilled();
                 this.updateRealmUI();
                 break;
+            case 'gardenExp':
+                this.gardenExpMultiplier = val.toNumber();
+                this.log('SYS', `金手指: 灵植经验倍率设为 ${this.gardenExpMultiplier}x`);
+                break;
+            case 'gardenStone':
+                this.gardenStoneMultiplier = val.toNumber();
+                this.log('SYS', `金手指: 灵植灵石倍率设为 ${this.gardenStoneMultiplier}x`);
+                break;
         }
         
         this.updateStatsUI();
@@ -1149,6 +1184,415 @@ class Game {
         const log = document.getElementById('battle-log');
         log.appendChild(d);
         log.scrollTop = log.scrollHeight;
+    }
+
+    // --- Spirit Garden Methods ---
+    // Calculate garden income rates (per minute)
+    calculateGardenIncomeRates() {
+        if (!this.garden) return { stonesPerMin: new BigNum(0), expPerMin: new BigNum(0) };
+        
+        const g = this.garden;
+        let totalIncomePerSec = new BigNum(0);
+        let totalExpPerSec = new BigNum(0);
+        
+        g.lands.forEach(land => {
+            if (land.unlocked && land.plant) {
+                const crop = land.plant;
+                const harvestsPerSec = 1 / crop.time;
+                
+                let income = crop.income.mul(harvestsPerSec);
+                let exp = crop.exp.mul(harvestsPerSec);
+                
+                // Apply bonuses
+                if (g.alchemyMode && g.gardenLevel >= GARDEN_CONFIG.alchemyUnlockLevel) {
+                    income = income.mul(GARDEN_CONFIG.alchemyBonus);
+                }
+                if (this.hasAdvancedPuppet) {
+                    income = income.mul(1.1);
+                }
+                
+                // Apply cheat multipliers
+                if (this.gardenStoneMultiplier > 1) {
+                    income = income.mul(this.gardenStoneMultiplier);
+                }
+                if (this.gardenExpMultiplier > 1) {
+                    exp = exp.mul(this.gardenExpMultiplier);
+                }
+                
+                totalIncomePerSec = totalIncomePerSec.add(income);
+                totalExpPerSec = totalExpPerSec.add(exp);
+            }
+        });
+        
+        return {
+            stonesPerMin: totalIncomePerSec.mul(60),
+            expPerMin: totalExpPerSec.mul(60)
+        };
+    }
+    
+    // Update garden overview (shown in main tab)
+    updateGardenOverview() {
+        if (!this.garden) return;
+        
+        const g = this.garden;
+        const rates = this.calculateGardenIncomeRates();
+        
+        // Update overview elements
+        const overviewLevel = document.getElementById('garden-overview-level');
+        const overviewTurn = document.getElementById('garden-overview-turn');
+        const overviewStones = document.getElementById('garden-overview-stones');
+        const overviewIncome = document.getElementById('garden-overview-income');
+        const overviewExp = document.getElementById('garden-overview-exp');
+        const overviewLands = document.getElementById('garden-overview-lands');
+        const overviewMature = document.getElementById('garden-overview-mature');
+        
+        if (overviewLevel) overviewLevel.innerText = g.gardenLevel;
+        if (overviewTurn) overviewTurn.innerText = GARDEN_CONFIG.turnNames[g.turn];
+        if (overviewStones) overviewStones.innerText = formatNum(g.spiritStones);
+        if (overviewIncome) overviewIncome.innerText = '+' + formatNum(rates.stonesPerMin) + '/分';
+        if (overviewExp) overviewExp.innerText = '+' + formatNum(rates.expPerMin) + '/分';
+        
+        const unlockedLands = g.lands.filter(l => l.unlocked).length;
+        const matureLands = g.lands.filter(l => l.plant && l.progress >= 100).length;
+        if (overviewLands) overviewLands.innerText = unlockedLands;
+        if (overviewMature) overviewMature.innerText = matureLands;
+    }
+    
+    // Update a single land element
+    updateSingleLand(index) {
+        if (!this.garden) return;
+        
+        const g = this.garden;
+        const land = g.lands[index];
+        const div = document.getElementById(`garden-land-${index}`);
+        if (!div) return;
+        
+        // Check if content needs updating by comparing current state
+        const isLocked = !land.unlocked;
+        const isEmpty = land.unlocked && !land.plant;
+        const isGrowing = land.plant && land.progress < 100;
+        const isMature = land.plant && land.progress >= 100;
+        
+        // Determine what classes/content this land should have
+        let expectedClass = 'garden-land';
+        let expectedHTML = '';
+        
+        if (isLocked) {
+            expectedClass += ' locked';
+            expectedHTML = `
+                <div class="land-lock">
+                    <i class="fas fa-lock"></i>
+                    <div class="unlock-cost">${formatNum(land.unlockCost)}</div>
+                </div>
+            `;
+        } else if (isEmpty) {
+            expectedClass += ' empty';
+            if (g.puppetMode && land.lastSeedId && g.gardenLevel >= GARDEN_CONFIG.puppetUnlockLevel) {
+                expectedHTML = `<div class="auto-plant-hint"><i class="fas fa-magic"></i></div>`;
+            } else {
+                expectedHTML = `<div class="plant-hint"><i class="fas fa-plus"></i></div>`;
+            }
+        } else if (land.plant) {
+            if (isMature) {
+                expectedClass += ' mature';
+                expectedHTML = `
+                    <div class="crop-icon">${land.plant.icon}</div>
+                    <div class="mature-indicator"><i class="fas fa-check"></i></div>
+                `;
+            } else {
+                expectedClass += ' growing';
+                expectedHTML = `
+                    <div class="crop-icon">${land.plant.icon}</div>
+                    <div class="progress-bar"><div style="width: ${land.progress.toFixed(1)}%"></div></div>
+                `;
+            }
+        }
+        
+        // Only update if changed
+        if (div.className !== expectedClass || div.innerHTML !== expectedHTML) {
+            div.className = expectedClass;
+            div.innerHTML = expectedHTML;
+        }
+    }
+    
+    // Update only seed selection state
+    updateSeedSelection() {
+        if (!this.garden) return;
+        
+        const g = this.garden;
+        const seedList = document.getElementById('modal-seed-list');
+        if (!seedList) return;
+        
+        seedList.querySelectorAll('.seed-item').forEach(item => {
+            const cropId = parseInt(item.dataset.cropId);
+            if (cropId === g.selectedSeedId) {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+    }
+    
+    // Update only progress bars (real-time)
+    updateGardenProgressBars() {
+        if (!this.garden) return;
+        
+        const g = this.garden;
+        
+        // Update each land (efficient - only updates if changed)
+        g.lands.forEach((land, index) => {
+            this.updateSingleLand(index);
+        });
+    }
+    
+    // Update full garden UI (shown in modal)
+    updateGardenUI() {
+        if (!this.garden) return;
+        
+        const g = this.garden;
+        
+        // Update level and exp
+        const levelEl = document.getElementById('garden-modal-level');
+        const turnEl = document.getElementById('garden-modal-turn');
+        const expBar = document.getElementById('garden-modal-exp-bar');
+        const stonesEl = document.getElementById('garden-modal-stones');
+        
+        if (levelEl) levelEl.innerText = g.gardenLevel;
+        if (turnEl) turnEl.innerText = GARDEN_CONFIG.turnNames[g.turn];
+        if (stonesEl) stonesEl.innerText = formatNum(g.spiritStones);
+        
+        if (expBar) {
+            const maxExp = g.getMaxExp();
+            const pct = Math.min(100, g.gardenExp.div(maxExp).toNumber() * 100);
+            expBar.style.width = pct + '%';
+        }
+        
+        // Update income rates
+        const rates = this.calculateGardenIncomeRates();
+        const incomeEl = document.getElementById('garden-modal-income');
+        const expRateEl = document.getElementById('garden-modal-exp-rate');
+        if (incomeEl) incomeEl.innerText = '+' + formatNum(rates.stonesPerMin) + '/分';
+        if (expRateEl) expRateEl.innerText = '+' + formatNum(rates.expPerMin) + '/分';
+        
+        // Update land grid (create once, then efficient update)
+        const landGrid = document.getElementById('modal-land-grid');
+        if (landGrid) {
+            // Create land elements if needed
+            if (landGrid.children.length !== g.lands.length) {
+                landGrid.innerHTML = '';
+                g.lands.forEach((land, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'garden-land';
+                    div.id = `garden-land-${index}`;
+                    // Use addEventListener once
+                    div.addEventListener('click', (e) => {
+                        g.handleLandClick(index, e);
+                        // Only update changed land, not full UI
+                        this.updateSingleLand(index);
+                        this.updateGardenOverview();
+                    });
+                    landGrid.appendChild(div);
+                });
+            }
+            
+            // Update all lands
+            g.lands.forEach((land, index) => {
+                this.updateSingleLand(index);
+            });
+        }
+        
+        // Update turn selector (dropdown)
+        const turnSelector = document.getElementById('modal-turn-selector');
+        if (turnSelector) {
+            const unlockedTurns = g.getUnlockedTurns();
+            
+            // Check if we need to rebuild options (unlock count changed)
+            const currentOptions = turnSelector.querySelectorAll('option');
+            const needRebuild = currentOptions.length !== (unlockedTurns + 1);
+            
+            if (needRebuild) {
+                turnSelector.innerHTML = '';
+                
+                GARDEN_CONFIG.turnNames.forEach((name, idx) => {
+                    if (idx <= unlockedTurns) {
+                        const option = document.createElement('option');
+                        option.value = idx;
+                        option.innerText = name;
+                        turnSelector.appendChild(option);
+                    }
+                });
+            }
+            
+            // Set current selection
+            turnSelector.value = g.shopTurn;
+        }
+        
+        // Auto-select first seed if none selected or current not available
+        const availableCrops = g.getAvailableCrops();
+        const currentSeedAvailable = availableCrops.some(c => c.id === g.selectedSeedId);
+        if (!g.selectedSeedId || !currentSeedAvailable) {
+            if (availableCrops.length > 0) {
+                g.selectedSeedId = availableCrops[0].id;
+            }
+        }
+        
+        // Update seed list (efficient: only create if needed, otherwise update selection)
+        const seedList = document.getElementById('modal-seed-list');
+        if (seedList) {
+            const crops = g.getAvailableCrops();
+            
+            // Check if we need to recreate the list (first time, turn changed, or crops changed)
+            const existingItems = seedList.querySelectorAll('.seed-item');
+            const firstCropId = existingItems.length > 0 ? parseInt(existingItems[0].dataset.cropId) : null;
+            const currentFirstCropId = crops.length > 0 ? crops[0].id : null;
+            const needRecreate = existingItems.length !== crops.length || firstCropId !== currentFirstCropId;
+            
+            if (needRecreate) {
+                // Full recreate
+                seedList.innerHTML = '';
+                
+                // Debug: if no crops available, show message
+                if (crops.length === 0) {
+                    const emptyMsg = document.createElement('div');
+                    emptyMsg.style.cssText = 'text-align:center; padding:20px; color:#666; font-size:0.8rem;';
+                    emptyMsg.innerText = '暂无可用种子 (Lv.' + g.gardenLevel + ')';
+                    seedList.appendChild(emptyMsg);
+                }
+                
+                crops.forEach(crop => {
+                    const div = document.createElement('div');
+                    div.dataset.cropId = crop.id;
+                    div.className = 'seed-item';
+                    
+                    div.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        g.selectSeed(crop.id);
+                        // Only update selection, not full UI
+                        this.updateSeedSelection();
+                    });
+                    
+                    const qualityColor = CROP_QUALITY_COLORS[crop.quality] || '#9ca3af';
+                    
+                    div.innerHTML = `
+                        <div class="seed-icon" style="color: ${qualityColor}">${crop.icon}</div>
+                        <div class="seed-info">
+                            <div class="seed-name" style="color: ${qualityColor}">${crop.name}</div>
+                            <div class="seed-stats">
+                                <span><i class="far fa-clock"></i> ${crop.time}s</span>
+                                <span>💎 ${formatNum(crop.income)}</span>
+                            </div>
+                        </div>
+                        <div class="seed-cost">-${formatNum(crop.cost)}</div>
+                    `;
+                    
+                    seedList.appendChild(div);
+                });
+                
+                // Show next unlock hint
+                const nextUnlock = g.getNextUnlockInTurn();
+                if (nextUnlock) {
+                    const hint = document.createElement('div');
+                    hint.className = 'unlock-hint';
+                    hint.id = 'garden-unlock-hint';
+                    hint.innerHTML = `<i class="fas fa-lock"></i> 下一级 ${nextUnlock.name} 需 Lv.${nextUnlock.reqLevel}`;
+                    seedList.appendChild(hint);
+                }
+            }
+            
+            // Update selection state
+            this.updateSeedSelection();
+        }
+        
+        // Update tool selection
+        const shovelBtn = document.getElementById('modal-shovel-btn');
+        if (shovelBtn) {
+            shovelBtn.className = 'tool-btn ' + (g.selectedTool === 'shovel' ? 'active' : '');
+            // Bind click event if not already bound
+            if (!shovelBtn.dataset.bound) {
+                shovelBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    console.log('Shovel button clicked');
+                    this.selectGardenTool('shovel');
+                });
+                shovelBtn.dataset.bound = 'true';
+            }
+        }
+        
+        // Update puppet toggle
+        const puppetBtn = document.getElementById('modal-puppet-btn');
+        if (puppetBtn) {
+            puppetBtn.className = 'puppet-toggle ' + (g.puppetMode ? 'active' : '');
+            puppetBtn.innerHTML = g.puppetMode ? '🤖 傀儡: ON' : '🤖 傀儡: OFF';
+            puppetBtn.disabled = g.gardenLevel < GARDEN_CONFIG.puppetUnlockLevel;
+        }
+        
+        // Update alchemy toggle
+        const alchemyToggle = document.getElementById('modal-alchemy-toggle');
+        if (alchemyToggle) {
+            alchemyToggle.style.display = g.gardenLevel >= GARDEN_CONFIG.alchemyUnlockLevel ? 'flex' : 'none';
+            const alchemyBtn = document.getElementById('modal-alchemy-btn');
+            if (alchemyBtn) {
+                alchemyBtn.className = g.alchemyMode ? 'active' : '';
+                alchemyBtn.innerText = g.alchemyMode ? 'ON (+20%)' : 'OFF';
+            }
+        }
+    }
+    
+    // Open/Close Garden Modal
+    openGardenModal() {
+        this.isGardenModalOpen = true;
+        // Ensure a valid seed is selected
+        if (this.garden) {
+            const availableCrops = this.garden.getAvailableCrops();
+            const currentSeedAvailable = availableCrops.some(c => c.id === this.garden.selectedSeedId);
+            if (!this.garden.selectedSeedId || !currentSeedAvailable) {
+                if (availableCrops.length > 0) {
+                    this.garden.selectedSeedId = availableCrops[0].id;
+                }
+            }
+        }
+        document.getElementById('garden-full-modal').style.display = 'flex';
+        this.updateGardenUI();
+    }
+    
+    closeGardenModal() {
+        this.isGardenModalOpen = false;
+        document.getElementById('garden-full-modal').style.display = 'none';
+    }
+    
+    gardenOneClickHarvest() {
+        if (this.garden) this.garden.oneClickHarvest();
+        this.updateGardenUI();
+        this.updateGardenOverview();
+    }
+    
+    gardenOneClickPlant() {
+        if (this.garden) this.garden.oneClickPlant();
+        this.updateGardenUI();
+        this.updateGardenOverview();
+    }
+    
+    gardenOneClickClear() {
+        if (this.garden) this.garden.oneClickClear();
+        this.updateGardenUI();
+        this.updateGardenOverview();
+    }
+    
+    togglePuppetMode() {
+        if (this.garden) this.garden.togglePuppetMode();
+        this.updateGardenUI();
+        this.updateGardenOverview();
+    }
+    
+    toggleAlchemyMode() {
+        if (this.garden) this.garden.toggleAlchemyMode();
+        this.updateGardenUI();
+        this.updateGardenOverview();
+    }
+    
+    selectGardenTool(tool) {
+        if (this.garden) this.garden.selectTool(tool);
+        this.updateGardenUI();
     }
 }
 

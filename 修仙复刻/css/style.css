@@ -614,6 +614,315 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     border: 1px solid #ff9800 !important;
 }
 
+/* Spirit Garden System */
+.garden-land-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-top: 10px;
+    padding: 8px;
+    background: #1a1a1a;
+    border-radius: 8px;
+}
+
+.garden-land {
+    aspect-ratio: 1;
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.9rem;
+    position: relative;
+    border: 1px solid;
+}
+
+.garden-land.locked {
+    background: #1f2937;
+    border-color: #374151;
+    color: #6b7280;
+}
+
+.garden-land.locked .land-lock {
+    text-align: center;
+}
+
+.garden-land.locked .unlock-cost {
+    font-size: 0.6rem;
+    color: #fbbf24;
+    margin-top: 2px;
+}
+
+.garden-land.empty {
+    background: #262626;
+    border-color: #404040;
+    color: #525252;
+}
+
+.garden-land.empty:hover {
+    background: #2d2d2d;
+    border-color: #22c55e;
+}
+
+.garden-land.growing {
+    background: #1a2f1a;
+    border-color: #166534;
+}
+
+.garden-land.mature {
+    background: #2d2a1a;
+    border-color: #fbbf24;
+    animation: mature-pulse 2s infinite;
+}
+
+@keyframes mature-pulse {
+    0%, 100% { box-shadow: inset 0 0 10px rgba(251, 191, 36, 0.3); }
+    50% { box-shadow: inset 0 0 20px rgba(251, 191, 36, 0.6); }
+}
+
+.garden-land .crop-icon {
+    font-size: 1.5rem;
+}
+
+.garden-land .progress-bar {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    height: 3px;
+    background: #1f2937;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.garden-land .progress-bar div {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e, #16a34a);
+    transition: width 0.3s;
+}
+
+.garden-land .mature-indicator {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    color: #fbbf24;
+    font-size: 0.7rem;
+}
+
+.garden-land .plant-hint {
+    opacity: 0.3;
+    font-size: 1.2rem;
+}
+
+.garden-land:hover .plant-hint {
+    opacity: 0.8;
+}
+
+.garden-land .auto-plant-hint {
+    color: #a855f7;
+    font-size: 0.7rem;
+    text-align: center;
+}
+
+/* Turn Selector */
+.turn-btn {
+    padding: 4px 10px;
+    background: #374151;
+    border: none;
+    border-radius: 4px;
+    color: #9ca3af;
+    font-size: 0.7rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.turn-btn:hover {
+    background: #4b5563;
+}
+
+.turn-btn.active {
+    background: #16a34a;
+    color: white;
+}
+
+/* Turn Selector Dropdown */
+#modal-turn-selector {
+    width: 100%;
+    padding: 6px 10px;
+    background: #262626;
+    border: 1px solid #4b5563;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    outline: none;
+}
+
+#modal-turn-selector:hover {
+    border-color: #22c55e;
+}
+
+#modal-turn-selector:focus {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+#modal-turn-selector option {
+    background: #262626;
+    color: #fff;
+    padding: 8px;
+}
+
+/* Seed List */
+#modal-seed-list .seed-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    background: #262626;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid transparent;
+    pointer-events: auto;
+    user-select: none;
+}
+
+#modal-seed-list .seed-item:hover {
+    background: #333;
+    border-color: #4b5563;
+}
+
+#modal-seed-list .seed-item.selected {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.2);
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.3);
+}
+
+#modal-seed-list .seed-icon {
+    font-size: 1.3rem;
+    width: 28px;
+    text-align: center;
+}
+
+#modal-seed-list .seed-info {
+    flex: 1;
+}
+
+#modal-seed-list .seed-name {
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+#modal-seed-list .seed-stats {
+    font-size: 0.65rem;
+    color: #6b7280;
+    display: flex;
+    gap: 8px;
+}
+
+#modal-seed-list .seed-cost {
+    font-size: 0.75rem;
+    color: #f87171;
+}
+
+#modal-seed-list .unlock-hint {
+    text-align: center;
+    padding: 8px;
+    color: #6b7280;
+    font-size: 0.7rem;
+    border: 1px dashed #374151;
+    border-radius: 4px;
+    margin-top: 4px;
+}
+
+/* Tool Button */
+.tool-btn {
+    transition: all 0.2s;
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+.tool-btn.active {
+    border-color: #ef4444 !important;
+    background: rgba(239, 68, 68, 0.2) !important;
+}
+
+#modal-shovel-btn {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* Garden Overview Tab */
+#tab-garden .system-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-garden {
+    background: linear-gradient(to right, #15803d, #22c55e) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-garden:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
+}
+
+/* Garden Modal Specific Styles */
+#garden-full-modal .modal-content {
+    background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+    pointer-events: auto;
+}
+
+#garden-full-modal .garden-land-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+/* Ensure seed list container allows clicks */
+#modal-seed-list {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+    #garden-full-modal .modal-content {
+        width: 95% !important;
+        height: 95% !important;
+    }
+    
+    #garden-full-modal > div > div {
+        flex-direction: column !important;
+    }
+    
+    #garden-full-modal .garden-land-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+/* Puppet Toggle */
+#puppet-btn, #modal-puppet-btn {
+    transition: all 0.2s;
+}
+
+#puppet-btn.active, #modal-puppet-btn.active {
+    opacity: 1 !important;
+    box-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
+}
+
+#puppet-btn:disabled, #modal-puppet-btn:disabled {
+    opacity: 0.4 !important;
+    cursor: not-allowed;
+}
+
 /* Realm Breakthrough System */
 .realm-boss-entity {
     background: radial-gradient(circle, #ffd700, #b8860b);
