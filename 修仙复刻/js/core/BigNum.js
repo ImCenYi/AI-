@@ -59,6 +59,24 @@ class BigNum {
         const newM = Math.pow(10, newLog - newE);
         return new BigNum(newM, newE);
     }
+    
+    /**
+     * 指数加成 - 对数值的指数部分进行加成
+     * 例如: 1e1000 经过 5% 指数加成 -> 1e1050
+     * @param {number} bonusPercent - 加成百分比 (如 0.05 表示 5%)
+     * @returns {BigNum} 加成后的数值
+     */
+    expBonus(bonusPercent) {
+        if (this.m === 0) return new BigNum(0);
+        // 计算总对数值 (log10(值) = log10(尾数) + 指数)
+        const totalLog = Math.log10(this.m) + this.e;
+        // 对总对数值进行加成
+        const newLog = totalLog * (1 + bonusPercent);
+        // 转换回 BigNum
+        const newE = Math.floor(newLog);
+        const newM = Math.pow(10, newLog - newE);
+        return new BigNum(newM, newE);
+    }
 
     log10() {
         if (this.m <= 0) return 0;

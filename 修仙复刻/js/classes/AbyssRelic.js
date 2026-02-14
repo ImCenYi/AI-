@@ -20,8 +20,14 @@ class AbyssRelic {
         this.game = game;
         // 玩家已拥有的遗宝 { relicId: { level, acquiredAt, upgradedAt } }
         this.collectedRelics = {};
-        // 遗宝碎片
-        this.fragments = 0;
+        // 遗宝碎片 - 每个BOSS独立 { bossId: fragments }
+        this.fragments = {
+            'dragon_lord': 0,
+            'demon_king': 0,
+            'void_beast': 0,
+            'ancient_god': 0,
+            'chaos_overlord': 0
+        };
         // 已激活的遗宝效果（乘算属性默认值为1，表示无加成时的基准倍率）
         this.activeBonuses = {
             allStatMult: 1,        // 全属性倍率 (乘算，默认1)
@@ -224,40 +230,62 @@ class AbyssRelic {
     }
 
     /**
-     * 遗宝溢转为碎片
+     * 获取遗宝所属的BOSS ID
+     * @param {string} relicId - 遗宝ID
+     * @returns {string|null} - BOSS ID
+     */
+    getRelicBossId(relicId) {
+        for (const bossId in ABYSS_RELIC_POOLS) {
+            const pool = ABYSS_RELIC_POOLS[bossId];
+            if (pool.find(r => r.id === relicId)) {
+                return bossId;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * 遗宝溢转为碎片（存入对应BOSS的碎片池）
      * @param {object} relic - 遗宝数据
-     * @returns {object} - 结果 { type: 'overflow', relic, fragments }
+     * @returns {object} - 结果 { type: 'overflow', relic, fragments, bossId }
      */
     overflowToFragments(relic) {
+        const bossId = this.getRelicBossId(relic.id);
         const overflowPoints = RELIC_QUALITIES[relic.quality]?.overflowPoints || 10;
-        this.fragments += overflowPoints;
+        
+        if (bossId && this.fragments[bossId] !== undefined) {
+            this.fragments[bossId] += overflowPoints;
+        }
         
         return {
             type: 'overflow',
             relic: relic,
             fragments: overflowPoints,
-            totalFragments: this.fragments
+            bossId: bossId,
+            totalFragments: bossId ? this.fragments[bossId] : 0
         };
     }
 
     /**
-     * 使用碎片兑换遗宝
+     * 使用碎片兑换遗宝（只能使用对应BOSS的碎片）
      * @param {string} relicId - 要兑换的遗宝ID
      * @returns {object|null} - 结果 { success, relic?, message? }
      */
     exchangeRelic(relicId) {
-        // 查找遗宝定义
+        // 查找遗宝定义和所属BOSS
         let relicDef = null;
-        for (const bossId in ABYSS_RELIC_POOLS) {
-            const pool = ABYSS_RELIC_POOLS[bossId];
+        let bossId = null;
+        for (const bid in ABYSS_RELIC_POOLS) {
+            const pool = ABYSS_RELIC_POOLS[bid];
             const found = pool.find(r => r.id === relicId);
             if (found) {
                 relicDef = found;
+                bossId = bid;
                 break;
             }
         }
         
-        if (!relicDef) {
+        if (!relicDef || !bossId) {
             return { success: false, message: '遗宝不存在' };
         }
 
@@ -266,24 +294,42 @@ class AbyssRelic {
             return { success: false, message: '已拥有该遗宝' };
         }
 
-        // 检查碎片是否足够
+        // 检查对应BOSS的碎片是否足够
         const cost = RELIC_QUALITIES[relicDef.quality]?.exchangeCost || 100;
-        if (this.fragments < cost) {
+        const bossFragments = this.fragments[bossId] || 0;
+        if (bossFragments < cost) {
             return { 
                 success: false, 
-                message: `碎片不足，需要${cost}碎片，当前${this.fragments}` 
+                message: `${this.getBossName(bossId)}碎片不足，需要${cost}，当前${bossFragments}` 
             };
         }
 
-        // 扣除碎片并添加遗宝
-        this.fragments -= cost;
+        // 扣除对应BOSS的碎片并添加遗宝
+        this.fragments[bossId] -= cost;
         const result = this.addRelic(relicDef);
         
         return {
             success: true,
             relic: result.relic,
-            remainingFragments: this.fragments
+            bossId: bossId,
+            remainingFragments: this.fragments[bossId]
         };
+    }
+    
+    /**
+     * 获取BOSS名称
+     * @param {string} bossId - BOSS ID
+     * @returns {string} - BOSS名称
+     */
+    getBossName(bossId) {
+        const bossNames = {
+            'dragon_lord': '深渊龙主',
+            'demon_king': '魔王',
+            'void_beast': '虚空巨兽',
+            'ancient_god': '古神',
+            'chaos_overlord': '混沌主宰'
+        };
+        return bossNames[bossId] || bossId;
     }
 
     /**

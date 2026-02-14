@@ -463,109 +463,299 @@ class AbyssDungeon {
         }
     }
     
-    // ==================== 遗宝图鉴功能 ====================
+    // ==================== 遗宝图鉴功能（5列布局） ====================
     
     showRelicCollection() {
         const modal = document.getElementById('abyss-codex-modal');
         if (!modal) return;
         
         modal.style.display = 'flex';
-        this.renderBossTabs();
-        
-        if (ABYSS_BOSSES?.length > 0) {
-            this.showBossRelics(ABYSS_BOSSES[0].id);
-        }
+        this.renderAllBossRelics();
     }
     
-    renderBossTabs() {
-        const container = document.getElementById('boss-tabs');
+    /**
+     * 渲染所有BOSS的遗宝（5列布局）
+     */
+    renderAllBossRelics() {
+        const container = document.getElementById('relic-codex-container');
         if (!container) return;
         
-        if (!ABYSS_BOSSES?.length) {
-            container.innerHTML = '<div style="color:#f87171;">数据加载失败</div>';
+        if (!ABYSS_BOSSES?.length || !ABYSS_RELIC_POOLS) {
+            container.innerHTML = '<div style="color:#f87171;grid-column:1/-1;text-align:center;">数据加载失败</div>';
             return;
         }
         
-        container.innerHTML = ABYSS_BOSSES.map(boss => `
-            <div class="boss-tab" data-boss-id="${boss.id}" onclick="game.abyssDungeon.showBossRelics('${boss.id}')"
-                 style="padding: 8px 15px; background: #262626; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">
-                ${boss.emoji} ${boss.name}
-            </div>
-        `).join('');
+        // 渲染总体进度
+        this.renderTotalProgress();
+        
+        // 渲染5列
+        container.innerHTML = ABYSS_BOSSES.map(boss => this.renderBossColumn(boss)).join('');
     }
     
-    showBossRelics(bossId) {
-        document.querySelectorAll('.boss-tab').forEach(tab => {
-            tab.classList.toggle('active', tab.dataset.bossId === bossId);
-            tab.style.background = tab.dataset.bossId === bossId ? '#8b5cf6' : '#262626';
-        });
+    /**
+     * 渲染单个BOSS列
+     */
+    renderBossColumn(boss) {
+        const pool = ABYSS_RELIC_POOLS[boss.id];
+        if (!pool) return '';
         
-        const pool = ABYSS_RELIC_POOLS?.[bossId];
-        const grid = document.getElementById('relic-collection-grid');
-        if (!grid) return;
+        const progress = this.abyssRelic.getBossCollectionProgress(boss.id);
+        const fragments = this.abyssRelic.fragments[boss.id] || 0;
         
-        if (!pool) {
-            grid.innerHTML = '<div style="color:#f87171;padding:20px;">遗宝数据加载失败</div>';
+        // 按品质分组显示（UR/SSR/SR/R/N）
+        const qualityOrder = ['UR', 'SSR', 'SR', 'R', 'N'];
+        
+        return `
+            <div class="boss-relic-column" style="
+                background: rgba(0,0,0,0.3);
+                border-radius: 10px;
+                border: 1px solid #333;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            ">
+                <!-- BOSS头部 -->
+                <div style="
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                    padding: 10px;
+                    text-align: center;
+                    border-bottom: 2px solid #444;
+                ">
+                    <div style="font-size: 1.5rem; margin-bottom: 3px;">${boss.emoji}</div>
+                    <div style="color: #fbbf24; font-weight: bold; font-size: 0.85rem;">${boss.name}</div>
+                    <div style="color: #888; font-size: 0.7rem; margin-top: 3px;">
+                        ${progress.collected}/${progress.total} (${progress.percentage}%)
+                    </div>
+                    <div style="color: #a78bfa; font-size: 0.75rem; margin-top: 5px;">
+                        🧩 ${fragments} 碎片
+                    </div>
+                </div>
+                
+                <!-- 遗宝列表 -->
+                <div style="flex:1; padding: 8px; overflow-y:auto; display:flex; flex-direction:column; gap:6px;">
+                    ${qualityOrder.map(quality => {
+                        const qualityRelics = pool.filter(r => r.quality === quality);
+                        if (qualityRelics.length === 0) return '';
+                        
+                        const qualityConf = RELIC_QUALITIES[quality];
+                        return `
+                            <div style="margin-bottom: 4px;">
+                                <div style="color: ${qualityConf.color}; font-size: 0.7rem; font-weight: bold; 
+                                            border-bottom: 1px solid ${qualityConf.color}40; padding-bottom: 2px; margin-bottom: 4px;">
+                                    ${quality} (${qualityRelics.length})
+                                </div>
+                                <div style="display:flex; flex-direction:column; gap:4px;">
+                                    ${qualityRelics.map(relic => this.renderRelicItem(relic, boss.id)).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                
+                <!-- 兑换按钮 -->
+                <div style="padding: 8px; border-top: 1px solid #333; background: rgba(0,0,0,0.2);">
+                    <button onclick="game.abyssDungeon.showExchangeModal('${boss.id}')" 
+                            style="width:100%; padding:6px; background:#8b5cf6; color:#fff; border:none; 
+                                   border-radius:5px; cursor:pointer; font-size:0.8rem;">
+                        🔮 兑换遗宝
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染单个遗宝项（小尺寸）
+     */
+    renderRelicItem(relic, bossId) {
+        const owned = this.abyssRelic.collectedRelics[relic.id];
+        const qualityConf = RELIC_QUALITIES?.[relic.quality];
+        const attrType = RELIC_ATTR_TYPES?.find(t => t.id === relic.attrType);
+        
+        let attrDisplay = '';
+        if (owned) {
+            const attrInfo = this.abyssRelic.getRelicAttrInfo(owned);
+            if (attrInfo) {
+                const prefix = attrInfo.calcType === 'multiplicative' ? '×' : '+';
+                attrDisplay = `${prefix}${attrInfo.value.toFixed(2)}`;
+            }
+        } else if (attrType) {
+            const baseValue = RELIC_BASE_VALUES?.[relic.attrType] || 0;
+            const qualityMult = qualityConf?.multiplier || 1;
+            const perLevelValue = baseValue * qualityMult;
+            const prefix = attrType.calcType === 'multiplicative' ? '×' : '+';
+            attrDisplay = `${prefix}${perLevelValue.toFixed(2)}/级`;
+        }
+        
+        return `
+            <div class="relic-item ${owned ? 'owned' : ''}" 
+                 onclick="game.abyssDungeon.showRelicDetail('${relic.id}', '${bossId}')"
+                 style="
+                    border: 1px solid ${qualityConf?.color || '#666'}; 
+                    ${owned ? `background: ${qualityConf?.color}15` : 'background: rgba(0,0,0,0.2); opacity: 0.5'};
+                    padding: 6px 8px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    transition: all 0.2s;
+                 "
+                 onmouseover="this.style.transform='translateX(3px)'; this.style.opacity='1';"
+                 onmouseout="this.style.transform='translateX(0)'; ${owned ? '' : 'this.style.opacity=\'0.5\''}">
+                <div style="font-size: 1.5rem;">${relic.icon}</div>
+                <div style="flex:1; min-width:0;">
+                    <div style="color: ${qualityConf?.color || '#888'}; font-size: 0.7rem; font-weight: bold; 
+                                white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        ${relic.name}
+                    </div>
+                    <div style="font-size: 0.6rem; color: #888;">
+                        ${owned ? `Lv.${owned.level} ${attrDisplay}` : attrDisplay}
+                    </div>
+                </div>
+                ${owned ? '<div style="color:#4ade80; font-size:0.7rem;">✓</div>' : ''}
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染总体收集进度
+     */
+    renderTotalProgress() {
+        const progressEl = document.getElementById('collection-progress');
+        if (!progressEl) return;
+        
+        const totalProgress = this.abyssRelic.getTotalProgress();
+        const totalFragments = Object.values(this.abyssRelic.fragments).reduce((a, b) => a + b, 0);
+        
+        progressEl.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="color: #fbbf24; font-size: 1rem; font-weight: bold;">
+                    📚 总体收集: ${totalProgress.collected}/${totalProgress.total} (${totalProgress.percentage}%)
+                </div>
+                <div style="color: #a78bfa; font-size: 0.9rem;">
+                    🧩 总碎片: ${totalFragments}
+                </div>
+            </div>
+            <div style="color: #888; font-size: 0.75rem; margin-top: 5px;">
+                每个BOSS的碎片只能兑换该BOSS的遗宝 | 点击遗宝查看详情
+            </div>
+        `;
+    }
+    
+    /**
+     * 显示兑换弹窗
+     */
+    showExchangeModal(bossId) {
+        const pool = ABYSS_RELIC_POOLS[bossId];
+        const boss = ABYSS_BOSSES.find(b => b.id === bossId);
+        const fragments = this.abyssRelic.fragments[bossId] || 0;
+        
+        if (!pool || !boss) return;
+        
+        // 获取未拥有的遗宝
+        const unownedRelics = pool.filter(r => !this.abyssRelic.collectedRelics[r.id]);
+        
+        if (unownedRelics.length === 0) {
+            alert(`${boss.name}的遗宝已收集齐！`);
             return;
         }
         
-        const boss = ABYSS_BOSSES.find(b => b.id === bossId);
+        // 创建兑换弹窗
+        const modalHtml = `
+            <div id="relic-exchange-modal" class="modal-overlay" style="
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 12000;
+                cursor: pointer;
+            " onclick="this.remove()">
+                <div style="
+                    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+                    border: 2px solid #8b5cf6;
+                    border-radius: 16px;
+                    padding: 25px;
+                    text-align: center;
+                    max-width: 400px;
+                    width: 90%;
+                    cursor: default;
+                " onclick="event.stopPropagation()">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">${boss.emoji}</div>
+                    <div style="color: #fbbf24; font-size: 1.2rem; font-weight: bold; margin-bottom: 5px;">
+                        兑换 ${boss.name} 遗宝
+                    </div>
+                    <div style="color: #a78bfa; font-size: 1rem; margin-bottom: 15px;">
+                        🧩 拥有碎片: ${fragments}
+                    </div>
+                    
+                    <div style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">
+                        ${unownedRelics.map(relic => {
+                            const qualityConf = RELIC_QUALITIES[relic.quality];
+                            const cost = qualityConf?.exchangeCost || 100;
+                            const canAfford = fragments >= cost;
+                            return `
+                                <div onclick="game.abyssDungeon.exchangeRelic('${relic.id}', '${bossId}')"
+                                     style="
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 10px;
+                                        padding: 10px;
+                                        margin-bottom: 8px;
+                                        background: ${canAfford ? 'rgba(139,92,246,0.2)' : 'rgba(100,100,100,0.2)'};
+                                        border: 1px solid ${canAfford ? qualityConf.color : '#666'};
+                                        border-radius: 8px;
+                                        cursor: ${canAfford ? 'pointer' : 'not-allowed'};
+                                        opacity: ${canAfford ? 1 : 0.5};
+                                     ">
+                                    <div style="font-size: 1.8rem;">${relic.icon}</div>
+                                    <div style="flex:1; text-align: left;">
+                                        <div style="color: ${qualityConf.color}; font-weight: bold; font-size: 0.85rem;">
+                                            ${relic.name}
+                                        </div>
+                                        <div style="color: #888; font-size: 0.7rem;">
+                                            需要 ${cost} 碎片
+                                        </div>
+                                    </div>
+                                    ${canAfford ? '<div style="color:#4ade80;">可兑换</div>' : '<div style="color:#666;">不足</div>'}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    
+                    <button onclick="document.getElementById('relic-exchange-modal').remove()" 
+                            style="padding: 8px 25px; background: #666; color: #fff; border: none; border-radius: 6px; cursor: pointer;">
+                        关闭
+                    </button>
+                </div>
+            </div>
+        `;
         
-        grid.innerHTML = pool.map(relic => {
-            const owned = this.abyssRelic.collectedRelics[relic.id];
-            const qualityConf = RELIC_QUALITIES?.[relic.quality];
-            const attrType = RELIC_ATTR_TYPES?.find(t => t.id === relic.attrType);
-            
-            let attrDisplay = '';
-            if (owned) {
-                const attrInfo = this.abyssRelic.getRelicAttrInfo(owned);
-                if (attrInfo) {
-                    const prefix = attrInfo.calcType === 'multiplicative' ? '×' : '+';
-                    attrDisplay = `${attrInfo.name}: ${prefix}${attrInfo.value.toFixed(2)}`;
-                }
-            } else if (attrType) {
-                const baseValue = RELIC_BASE_VALUES?.[relic.attrType] || 0;
-                const qualityMult = qualityConf?.multiplier || 1;
-                const perLevelValue = baseValue * qualityMult;
-                const prefix = attrType.calcType === 'multiplicative' ? '×' : '+';
-                attrDisplay = `${attrType.name}: ${prefix}${perLevelValue.toFixed(3)}/级`;
-            }
-            
-            // 方形布局：图标在上方，名称在下方，可点击
-            const clickHandler = owned 
-                ? `onclick="game.abyssDungeon.showRelicDetail('${relic.id}', '${bossId}')" style="cursor:pointer;"`
-                : `onclick="game.abyssDungeon.showRelicDetail('${relic.id}', '${bossId}')" style="cursor:pointer;"`;
-            
-            return `
-                <div class="relic-item ${owned ? 'owned' : ''}" 
-                     ${clickHandler}
-                     style="border: 2px solid ${qualityConf?.color || '#666'}; 
-                            ${owned ? `background: linear-gradient(135deg, ${qualityConf?.color}20 0%, ${qualityConf?.color}05 100%)` : 'background: rgba(0,0,0,0.3); opacity: 0.6'};
-                            padding: 12px 8px; border-radius: 10px; text-align: center;
-                            display: flex; flex-direction: column; align-items: center;
-                            min-height: 100px; justify-content: center;
-                            transition: transform 0.2s, box-shadow 0.2s;"
-                     onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 4px 12px ${qualityConf?.color || '#666'}40';"
-                     onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='none';">
-                    <div style="font-size: 2.2rem; margin-bottom: 6px;">${relic.icon}</div>
-                    <div style="color: ${qualityConf?.color || '#888'}; font-size: 0.75rem; font-weight: bold; line-height: 1.2;">${relic.name}</div>
-                    ${owned ? `<div style="color: ${qualityConf?.color}; font-size: 0.7rem; margin-top: 4px;">Lv.${owned.level}</div>` : ''}
-                    <div style="font-size: 0.6rem; color: #888; margin-top: 4px; line-height: 1.2;">${attrDisplay}</div>
-                </div>
-            `;
-        }).join('');
+        // 移除已有的弹窗
+        const existingModal = document.getElementById('relic-exchange-modal');
+        if (existingModal) existingModal.remove();
         
-        const progress = this.abyssRelic.getBossCollectionProgress(bossId);
-        const progressEl = document.getElementById('collection-progress');
-        if (progressEl && boss) {
-            progressEl.innerHTML = `
-                <div style="color: #fbbf24; font-size: 0.9rem;">
-                    ${boss.emoji} ${boss.name} | 收集: ${progress.collected}/${progress.total} (${progress.percentage}%)
-                </div>
-                <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">
-                    等级进度: ${progress.levelProgress}% | 碎片: ${this.abyssRelic.fragments}
-                </div>
-            `;
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+    }
+    
+    /**
+     * 兑换遗宝
+     */
+    exchangeRelic(relicId, bossId) {
+        const result = this.abyssRelic.exchangeRelic(relicId);
+        
+        if (result.success) {
+            this.game.log('GAIN', `兑换成功: ${result.relic.name}`);
+            this.game.updateAbyssOverview();
+            this.renderAllBossRelics(); // 刷新图鉴
+            document.getElementById('relic-exchange-modal')?.remove();
+        } else {
+            alert(result.message);
         }
     }
     

@@ -63,6 +63,7 @@ class Game {
         // Garden cheat multipliers
         this.gardenExpMultiplier = 1;
         this.gardenStoneMultiplier = 1;
+        this.gardenEssenceMultiplier = 1;
         
         this.isDead = false;
         this.lastTick = Date.now();
@@ -139,6 +140,21 @@ class Game {
             const relicBonuses = this.abyssRelic.getEffectiveBonuses();
             stats.atk = stats.atk.mul(relicBonuses.allStatMultiplier);
             maxHp = maxHp.mul(relicBonuses.allStatMultiplier);
+        }
+        
+        // Apply meridian refinement bonus
+        // 混合加成：前9次乘算 ×1.1，最后1次指数 +0.1%
+        if (this.garden && this.garden.refinement) {
+            const refinement = this.garden.refinement;
+            // 乘算部分
+            stats.atk = stats.atk.mul(refinement.totalMultiplier);
+            maxHp = maxHp.mul(refinement.totalMultiplier);
+            // 指数部分（每轮最后1次）
+            const expBonus = refinement.getTotalExpBonus();
+            if (expBonus > 0) {
+                stats.atk = stats.atk.expBonus(expBonus);
+                maxHp = maxHp.expBonus(expBonus);
+            }
         }
 
         return { ...stats, maxHp };
@@ -936,9 +952,17 @@ class Game {
                 this.gardenStoneMultiplier = val.toNumber();
                 this.log('SYS', `金手指: 灵植灵石倍率设为 ${this.gardenStoneMultiplier}x`);
                 break;
+            case 'gardenEssence':
+                this.gardenEssenceMultiplier = val.toNumber();
+                this.log('SYS', `金手指: 生灵精华倍率设为 ${this.gardenEssenceMultiplier}x`);
+                break;
             case 'abyssFrag':
-                this.abyssRelic.fragments += val.toNumber();
-                this.log('SYS', `金手指: 深渊遗宝碎片 +${val.toNumber()}`);
+                // 给所有BOSS添加碎片
+                const fragPerBoss = Math.floor(val.toNumber() / 5);
+                for (const bossId in this.abyssRelic.fragments) {
+                    this.abyssRelic.fragments[bossId] += fragPerBoss;
+                }
+                this.log('SYS', `金手指: 每个BOSS深渊遗宝碎片 +${fragPerBoss}`);
                 this.updateAbyssOverview();
                 break;
             case 'currentDiff':
@@ -1340,6 +1364,17 @@ class Game {
             document.getElementById('detail-relic-equip').innerText = '+0';
             document.getElementById('detail-relic-treasure').innerText = '+0';
         }
+        
+        // 经脉淬炼加成
+        if (this.garden && this.garden.refinement) {
+            const refinement = this.garden.refinement;
+            const expBonus = refinement.getTotalExpBonus();
+            document.getElementById('detail-meridian-mult').innerText = '×' + formatNum(refinement.totalMultiplier) + ' / +' + (expBonus * 100).toFixed(1) + '%';
+            document.getElementById('detail-meridian-round').innerText = refinement.refinementRound + '轮';
+        } else {
+            document.getElementById('detail-meridian-mult').innerText = '×1 / +0%';
+            document.getElementById('detail-meridian-round').innerText = '0轮';
+        }
     }
 
     updateCombatUI(force) {
@@ -1436,11 +1471,12 @@ class Game {
     // --- Spirit Garden Methods ---
     // Calculate garden income rates (per minute)
     calculateGardenIncomeRates() {
-        if (!this.garden) return { stonesPerMin: new BigNum(0), expPerMin: new BigNum(0) };
+        if (!this.garden) return { stonesPerMin: new BigNum(0), expPerMin: new BigNum(0), essencePerMin: new BigNum(0) };
         
         const g = this.garden;
         let totalIncomePerSec = new BigNum(0);
         let totalExpPerSec = new BigNum(0);
+        let totalEssencePerSec = new BigNum(0);
         
         g.lands.forEach(land => {
             if (land.unlocked && land.plant) {
@@ -1466,14 +1502,26 @@ class Game {
                     exp = exp.mul(this.gardenExpMultiplier);
                 }
                 
+                // 计算生灵精华产出（灵石的1/10）
+                let essence = income.div(10);
+                if (g.alchemyMode && g.gardenLevel >= GARDEN_CONFIG.alchemyUnlockLevel) {
+                    essence = essence.mul(1.5);
+                }
+                // 应用生灵精华倍率
+                if (this.gardenEssenceMultiplier > 1) {
+                    essence = essence.mul(this.gardenEssenceMultiplier);
+                }
+                
                 totalIncomePerSec = totalIncomePerSec.add(income);
                 totalExpPerSec = totalExpPerSec.add(exp);
+                totalEssencePerSec = totalEssencePerSec.add(essence);
             }
         });
         
         return {
             stonesPerMin: totalIncomePerSec.mul(60),
-            expPerMin: totalExpPerSec.mul(60)
+            expPerMin: totalExpPerSec.mul(60),
+            essencePerMin: totalEssencePerSec.mul(60)
         };
     }
     
@@ -1483,21 +1531,39 @@ class Game {
         
         const g = this.garden;
         const rates = this.calculateGardenIncomeRates();
+        const refinement = g.refinement;
         
         // Update overview elements
         const overviewLevel = document.getElementById('garden-overview-level');
         const overviewTurn = document.getElementById('garden-overview-turn');
         const overviewStones = document.getElementById('garden-overview-stones');
         const overviewIncome = document.getElementById('garden-overview-income');
-        const overviewExp = document.getElementById('garden-overview-exp');
+        const overviewEssence = document.getElementById('garden-overview-essence');
         const overviewLands = document.getElementById('garden-overview-lands');
         const overviewMature = document.getElementById('garden-overview-mature');
+        
+        // 经脉淬炼信息
+        const overviewRefineRound = document.getElementById('garden-overview-refine-round');
+        const overviewRefineStep = document.getElementById('garden-overview-refine-step');
+        const overviewMeridianBonus = document.getElementById('garden-overview-meridian-bonus');
         
         if (overviewLevel) overviewLevel.innerText = g.gardenLevel;
         if (overviewTurn) overviewTurn.innerText = GARDEN_CONFIG.turnNames[g.turn];
         if (overviewStones) overviewStones.innerText = formatNum(g.spiritStones);
         if (overviewIncome) overviewIncome.innerText = '+' + formatNum(rates.stonesPerMin) + '/分';
-        if (overviewExp) overviewExp.innerText = '+' + formatNum(rates.expPerMin) + '/分';
+        if (overviewEssence) overviewEssence.innerText = formatNum(refinement.lifeEssence);
+        
+        // 生灵精华产出速率
+        const overviewEssenceRate = document.getElementById('garden-overview-essence-rate');
+        if (overviewEssenceRate) overviewEssenceRate.innerText = formatNum(rates.essencePerMin);
+        
+        // 更新经脉淬炼信息
+        if (overviewRefineRound) overviewRefineRound.innerText = refinement.refinementRound + '轮';
+        if (overviewRefineStep) overviewRefineStep.innerText = refinement.refinementStep;
+        if (overviewMeridianBonus) {
+            const expBonus = refinement.getTotalExpBonus();
+            overviewMeridianBonus.innerText = '×' + formatNum(refinement.totalMultiplier) + ' / +' + (expBonus * 100).toFixed(1) + '%';
+        }
         
         const unlockedLands = g.lands.filter(l => l.unlocked).length;
         const matureLands = g.lands.filter(l => l.plant && l.progress >= 100).length;
@@ -1618,8 +1684,35 @@ class Game {
         const rates = this.calculateGardenIncomeRates();
         const incomeEl = document.getElementById('garden-modal-income');
         const expRateEl = document.getElementById('garden-modal-exp-rate');
+        const essenceRateEl = document.getElementById('garden-modal-essence-rate');
         if (incomeEl) incomeEl.innerText = '+' + formatNum(rates.stonesPerMin) + '/分';
         if (expRateEl) expRateEl.innerText = '+' + formatNum(rates.expPerMin) + '/分';
+        if (essenceRateEl) essenceRateEl.innerText = '+' + formatNum(rates.essencePerMin) + '/分';
+        
+        // Update meridian refinement UI
+        const refinement = g.refinement;
+        
+        // 更新经脉图
+        const meridianContainer = document.getElementById('meridian-map-container');
+        if (meridianContainer) {
+            meridianContainer.innerHTML = refinement.getMeridianMapHTML();
+        }
+        
+        // 更新淬炼信息
+        const refineRoundEl = document.getElementById('garden-refine-round');
+        const refineStepEl = document.getElementById('garden-refine-step');
+        const meridianBonusEl = document.getElementById('garden-meridian-bonus');
+        const lifeEssenceEl = document.getElementById('garden-life-essence');
+        const refineCostEl = document.getElementById('garden-refine-cost');
+        
+        if (refineRoundEl) refineRoundEl.innerText = refinement.refinementRound + '轮';
+        if (refineStepEl) refineStepEl.innerText = refinement.refinementStep + '/10';
+        if (meridianBonusEl) {
+            const expBonus = refinement.getTotalExpBonus();
+            meridianBonusEl.innerText = '×' + formatNum(refinement.totalMultiplier) + ' / +' + (expBonus * 100).toFixed(1) + '%';
+        }
+        if (lifeEssenceEl) lifeEssenceEl.innerText = formatNum(refinement.lifeEssence);
+        if (refineCostEl) refineCostEl.innerText = formatNum(refinement.getRefinementCost());
         
         // Update land grid (create once, then efficient update)
         const landGrid = document.getElementById('modal-land-grid');
@@ -1854,10 +1947,11 @@ class Game {
             progressEl.innerText = `${progress.collected}/${progress.total} (${progress.percentage}%)`;
         }
         
-        // 更新碎片数量
+        // 更新碎片数量（显示总碎片）
         const fragmentsEl = document.getElementById('abyss-overview-fragments');
         if (fragmentsEl) {
-            fragmentsEl.innerText = this.abyssRelic.fragments;
+            const totalFragments = Object.values(this.abyssRelic.fragments).reduce((a, b) => a + b, 0);
+            fragmentsEl.innerText = totalFragments;
         }
         
         // 更新属性加成预览
@@ -1867,8 +1961,13 @@ class Game {
             const effBonuses = this.abyssRelic.getEffectiveBonuses();
             const bonusTexts = [];
             
-            // 显示碎片数量
-            bonusTexts.push(`🧩 遗宝碎片: ${this.abyssRelic.fragments}`);
+            // 显示各BOSS碎片数量
+            const fragTexts = [];
+            for (const bossId in this.abyssRelic.fragments) {
+                const bossName = this.abyssRelic.getBossName(bossId);
+                fragTexts.push(`${bossName}: ${this.abyssRelic.fragments[bossId]}`);
+            }
+            bonusTexts.push(`🧩 碎片: ${fragTexts.join(' | ')}`);
             
             // 1. 全属性倍率（指数级乘数）
             if (bonuses.allStatMult > 1) {

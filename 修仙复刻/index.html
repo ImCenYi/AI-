@@ -207,8 +207,26 @@
                     <span id="garden-overview-income" class="val highlight" style="color:#22c55e;">+0/分</span>
                 </div>
                 <div class="sub-stat">
-                    <span>经验获取:</span>
-                    <span id="garden-overview-exp" class="val highlight" style="color:#3b82f6;">+0/分</span>
+                    <span>生灵精华:</span>
+                    <span id="garden-overview-essence" class="val highlight" style="color:#a78bfa;">0</span>
+                    <span style="font-size:0.7rem; color:#888;">(+<span id="garden-overview-essence-rate">0</span>/分)</span>
+                </div>
+                
+                <!-- 经脉淬炼信息 -->
+                <div style="background: rgba(139,92,246,0.1); border: 1px solid #8b5cf6; border-radius: 8px; padding: 8px; margin: 10px 0;">
+                    <div style="color: #8b5cf6; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">🧘 经脉淬炼</div>
+                    <div class="sub-stat" style="margin:3px 0;">
+                        <span>淬炼轮次:</span>
+                        <span id="garden-overview-refine-round" class="val" style="color:#fbbf24;">0轮</span>
+                    </div>
+                    <div class="sub-stat" style="margin:3px 0;">
+                        <span>当前进度:</span>
+                        <span><span id="garden-overview-refine-step" class="val">0</span>/10</span>
+                    </div>
+                    <div class="sub-stat" style="margin:3px 0;">
+                        <span>全属性加成:</span>
+                        <span id="garden-overview-meridian-bonus" class="val" style="color:#ef4444;">×1 / +0%</span>
+                    </div>
                 </div>
                 
                 <!-- 土地状态 -->
@@ -340,14 +358,63 @@
 
 <!-- Garden Full Screen Modal -->
 <div id="garden-full-modal" class="game-modal" style="z-index: 1500;">
-    <div class="modal-content" style="width: 90%; max-width: 800px; height: 90%; display: flex; flex-direction: column;">
+    <div class="modal-content" style="width: 95%; max-width: 1100px; height: 90%; display: flex; flex-direction: column;">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
             <h2 style="margin:0; color:#22c55e;">🌿 百草灵园</h2>
             <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeGardenModal()">✕</button>
         </div>
         
         <div style="display:flex; gap:15px; flex:1; overflow:hidden;">
-            <!-- 左侧：灵植园主界面 -->
+            <!-- 左侧：经脉淬炼 -->
+            <div style="flex:1; display:flex; flex-direction:column; gap:10px; min-width:220px; max-width:280px;">
+                <!-- 经脉图 -->
+                <div style="background:#1a1a1a; padding:10px; border-radius:8px; flex:1; display:flex; flex-direction:column;">
+                    <h3 style="margin:0 0 10px 0; color:#8b5cf6; font-size:1rem;">🧘 经脉淬炼</h3>
+                    
+                    <!-- 经脉图容器 -->
+                    <div id="meridian-map-container" style="flex:1; position:relative; background:radial-gradient(circle at center, #1a1a2e 0%, #0f0f1a 100%); border-radius:8px; min-height:300px; overflow:hidden;">
+                        <!-- 由JS生成经脉图 -->
+                    </div>
+                    
+                    <!-- 淬炼信息 -->
+                    <div style="margin-top:10px; padding:10px; background:#262626; border-radius:6px;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                            <span style="color:#888;">当前轮次:</span>
+                            <span id="garden-refine-round" style="color:#fbbf24; font-weight:bold;">0轮</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                            <span style="color:#888;">当前进度:</span>
+                            <span id="garden-refine-step" style="color:#22c55e;">0/10</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:8px;">
+                            <span style="color:#888;">全属性加成:</span>
+                            <span id="garden-meridian-bonus" style="color:#ef4444; font-weight:bold;">×1 / +0%</span>
+                        </div>
+                        <div style="border-top:1px solid #444; padding-top:8px; margin-top:8px;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                                <span style="color:#a78bfa;">💧 生灵精华:</span>
+                                <span id="garden-life-essence" style="color:#a78bfa; font-weight:bold;">0</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; color:#666;">
+                                <span>下次消耗:</span>
+                                <span id="garden-refine-cost">100</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 淬炼按钮 -->
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:10px;">
+                        <button class="sys-btn" style="background:linear-gradient(to right, #7c3aed, #8b5cf6); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAndUpdate()">
+                            淬炼经脉
+                        </button>
+                        <button class="sys-btn" style="background:linear-gradient(to right, #4c1d95, #6d28d9); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAll()">
+                            一键淬炼
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间：灵植园主界面 -->
             <div style="flex:2; display:flex; flex-direction:column; gap:10px; overflow:hidden;">
                 <!-- 状态栏 -->
                 <div style="background:#1a1a1a; padding:10px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
@@ -366,7 +433,8 @@
                         </div>
                         <div style="font-size:0.75rem; color:#888;">
                             <span style="color:#22c55e;" id="garden-modal-income">+0/分</span> | 
-                            <span style="color:#3b82f6;" id="garden-modal-exp-rate">+0/分</span>
+                            <span style="color:#3b82f6;" id="garden-modal-exp-rate">+0/分</span> | 
+                            <span style="color:#a78bfa;" id="garden-modal-essence-rate">+0/分</span>
                         </div>
                     </div>
                 </div>
@@ -471,25 +539,20 @@
 
 <!-- Abyss Codex Modal (遗宝图鉴) -->
 <div id="abyss-codex-modal" class="game-modal">
-    <div class="modal-content" style="width: 90%; max-width: 900px; height: 90%; display: flex; flex-direction: column;">
+    <div class="modal-content" style="width: 95%; max-width: 1200px; height: 90%; display: flex; flex-direction: column;">
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
             <h2 style="margin:0; color:#8b5cf6;">📚 遗宝图鉴</h2>
             <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeAbyssCodex()">✕</button>
         </div>
         
-        <!-- BOSS标签页 -->
-        <div id="boss-tabs" style="display:flex; gap:5px; margin-bottom:10px; overflow-x:auto;">
-            <!-- 由JS生成 -->
-        </div>
-        
-        <!-- 收集进度 -->
+        <!-- 总体收集进度 -->
         <div id="collection-progress" style="margin-bottom:10px; padding:10px; background:#1a1a1a; border-radius:6px;">
             <!-- 由JS生成 -->
         </div>
         
-        <!-- 遗宝网格 -->
-        <div id="relic-collection-grid" style="flex:1; display:grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap:12px; overflow-y:auto; background:#1a1a1a; border-radius:8px; padding:12px;">
-            <!-- 由JS生成 -->
+        <!-- 5列遗宝图鉴（每列一个BOSS） -->
+        <div id="relic-codex-container" style="flex:1; display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; overflow-y:auto; background:#1a1a1a; border-radius:8px; padding:12px;">
+            <!-- 由JS生成5列 -->
         </div>
     </div>
 </div>
@@ -583,11 +646,21 @@
                 </div>
             </div>
             
+            <!-- 经脉淬炼加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">🧘 经脉淬炼 (百草灵园)</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
+                    <div>经脉加成: <span id="detail-meridian-mult" class="val" style="color:#8b5cf6">-</span></div>
+                    <div>淬炼轮次: <span id="detail-meridian-round" class="val">-</span></div>
+                </div>
+            </div>
+            
             <!-- 计算说明 -->
             <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; font-size: 0.75rem; color: #666;">
                 <div style="color: #888; margin-bottom: 5px;">📝 计算公式</div>
-                <div>最终攻击 = (基础攻击 + 装备攻击) × 法则攻击倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成</div>
-                <div>最终生命 = (基础生命 + 装备生命) × 法则生命倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成</div>
+                <div>最终攻击 = (基础攻击 + 装备攻击) × 法则攻击倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 经脉乘算，然后指数+经脉指数加成%</div>
+                <div>最终生命 = (基础生命 + 装备生命) × 法则生命倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 经脉乘算，然后指数+经脉指数加成%</div>
+                <div style="color: #8b5cf6; margin-top: 5px;">💡 经脉加成：前9次×1.1，最后1次指数+0.1%</div>
             </div>
         </div>
         
@@ -611,6 +684,7 @@
             <option value="diff">增加历史最高难度</option>
             <option value="gardenExp">灵植经验倍率</option>
             <option value="gardenStone">灵植灵石倍率</option>
+            <option value="gardenEssence">生灵精华倍率</option>
             <option value="abyssFrag">深渊遗宝碎片</option>
             <option value="currentDiff">当前主线难度</option>
         </select>
@@ -628,6 +702,7 @@
 <script src="js/classes/Item.js"></script>
 <script src="js/classes/Treasure.js"></script>
 <script src="js/classes/Dungeon.js"></script>
+<script src="js/classes/LifeEssenceRefinement.js"></script>
 <script src="js/classes/SpiritGarden.js"></script>
 <script src="js/classes/AbyssRelic.js"></script>
 <script src="js/classes/AbyssDungeon.js"></script>

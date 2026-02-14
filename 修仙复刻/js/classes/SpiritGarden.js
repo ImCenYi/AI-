@@ -19,6 +19,9 @@ class SpiritGarden {
         this.selectedSeedId = null;
         this.selectedTool = null;  // null or 'shovel'
         
+        // 生灵精华淬炼系统
+        this.refinement = new LifeEssenceRefinement(game);
+        
         // Initialize lands
         this.lands = [];
         for (let i = 0; i < GARDEN_CONFIG.maxLands; i++) {
@@ -207,11 +210,24 @@ class SpiritGarden {
             exp = exp.mul(this.game.gardenExpMultiplier);
         }
         
+        // 计算生灵精华产出（基于灵石收入的 1/10，指数级）
+        let lifeEssenceGain = income.div(10);
+        if (this.alchemyMode && this.gardenLevel >= GARDEN_CONFIG.alchemyUnlockLevel) {
+            lifeEssenceGain = lifeEssenceGain.mul(1.5); // 炼丹模式+50%精华
+        }
+        // 应用生灵精华倍率
+        if (this.game.gardenEssenceMultiplier && this.game.gardenEssenceMultiplier > 1) {
+            lifeEssenceGain = lifeEssenceGain.mul(this.game.gardenEssenceMultiplier);
+        }
+        
         // Add spirit stones
         this.spiritStones = this.spiritStones.add(income);
         
         // Add garden exp
         this.gardenExp = this.gardenExp.add(exp);
+        
+        // Add life essence
+        this.refinement.addLifeEssence(lifeEssenceGain);
         
         // Convert to law fragments (if law system unlocked)
         if (this.game.lawFragments !== undefined) {
@@ -237,7 +253,7 @@ class SpiritGarden {
         this.game.updateGardenOverview();
         this.game.updateSystemUI();
         
-        this.game.log('GAIN', `收获 ${cropName}，获得 ${formatNum(income)} 灵石`);
+        this.game.log('GAIN', `收获 ${cropName}，获得 ${formatNum(income)} 灵石，${formatNum(lifeEssenceGain)} 生灵精华`);
     }
     
     plant(land, seedId) {
