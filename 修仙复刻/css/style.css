@@ -978,3 +978,442 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     50% { border-color: #ff8c00; box-shadow: 0 0 15px #ff8c00; }
     100% { border-color: #ffd700; box-shadow: 0 0 5px #ffd700; }
 }
+
+/* ==================== 深渊遗宝系统样式 (Abyss Relic System) ==================== */
+
+/* Abyss Dungeon Modal */
+#abyss-full-modal .modal-content {
+    background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+    border: 1px solid #4c1d95;
+}
+
+/* BOSS列表 */
+#abyss-boss-list {
+    padding-right: 5px;
+}
+
+.abyss-boss-card {
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+}
+
+.abyss-boss-card:hover:not(.locked) {
+    border-color: #7c3aed;
+    background: #1e1b4b;
+    transform: translateX(3px);
+}
+
+.abyss-boss-card.selected {
+    border-color: #7c3aed;
+    background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+    box-shadow: 0 0 15px rgba(124, 58, 237, 0.3);
+}
+
+.abyss-boss-card.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #1a1a1a;
+}
+
+.abyss-boss-card.fighting {
+    border-color: #ef4444;
+    background: linear-gradient(135deg, #1a1a2e 0%, #450a0a 100%);
+}
+
+.abyss-boss-card.dead {
+    border-color: #6b7280;
+    background: #262626;
+}
+
+.boss-icon {
+    font-size: 2.5rem;
+    margin-bottom: 5px;
+}
+
+.boss-name {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 3px;
+}
+
+.boss-level {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 5px;
+}
+
+.boss-status {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #333;
+}
+
+.status-alive {
+    background: #166534;
+    color: #4ade80;
+}
+
+.status-fighting {
+    background: #991b1b;
+    color: #fca5a5;
+}
+
+.status-dead {
+    background: #525252;
+    color: #a3a3a3;
+}
+
+.boss-progress {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    font-size: 0.7rem;
+    color: #fbbf24;
+    background: rgba(0,0,0,0.5);
+    padding: 1px 5px;
+    border-radius: 4px;
+}
+
+.boss-lock {
+    position: absolute;
+    top: 5px;
+    right: 8px;
+    font-size: 0.7rem;
+    color: #9ca3af;
+}
+
+/* BOSS详情面板 */
+.abyss-empty {
+    color: #666;
+    text-align: center;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.abyss-boss-detail {
+    color: #e0e0e0;
+}
+
+.boss-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+}
+
+.boss-emoji {
+    font-size: 2rem;
+}
+
+.boss-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.boss-stats-preview {
+    background: #0f0f1a;
+    border-radius: 6px;
+    padding: 12px;
+    margin-bottom: 15px;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.stat-item:last-child {
+    margin-bottom: 0;
+}
+
+.stat-label {
+    color: #888;
+}
+
+.stat-value {
+    color: #fff;
+    font-family: monospace;
+}
+
+.boss-rewards {
+    margin-top: 15px;
+}
+
+.reward-title {
+    font-size: 0.9rem;
+    color: #fbbf24;
+    margin-bottom: 10px;
+}
+
+.relic-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.relic-quality-group {
+    border-left: 3px solid;
+    padding-left: 8px;
+}
+
+.quality-name {
+    font-size: 0.75rem;
+    margin-bottom: 4px;
+    font-weight: bold;
+}
+
+.relic-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.relic-icon {
+    font-size: 1.2rem;
+    opacity: 0.4;
+    filter: grayscale(100%);
+    transition: all 0.2s;
+}
+
+.relic-icon.owned {
+    opacity: 1;
+    filter: grayscale(0%);
+    position: relative;
+}
+
+.relic-icon .relic-level {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    font-size: 0.6rem;
+    background: #7c3aed;
+    color: white;
+    padding: 1px 3px;
+    border-radius: 3px;
+    min-width: 14px;
+    text-align: center;
+}
+
+/* 遗宝图鉴样式 */
+.codex-progress-bar {
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #7c3aed, #f59e0b);
+    transition: width 0.5s ease;
+}
+
+.progress-text {
+    text-align: center;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+.codex-boss-section {
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #333;
+}
+
+.codex-boss-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #333;
+}
+
+.codex-boss-header .boss-icon {
+    font-size: 1.5rem;
+}
+
+.codex-boss-header .boss-name {
+    flex: 1;
+    font-size: 1rem;
+}
+
+.codex-boss-header .boss-progress {
+    font-size: 0.8rem;
+    color: #fbbf24;
+    position: static;
+    background: transparent;
+    padding: 0;
+}
+
+.boss-lock-hint {
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.codex-relic-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+}
+
+.codex-relic-card {
+    background: #0f0f1a;
+    border: 2px solid;
+    border-radius: 6px;
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.codex-relic-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.codex-relic-card.owned {
+    opacity: 1;
+}
+
+.codex-relic-card.unowned {
+    opacity: 0.6;
+}
+
+.codex-relic-card.unowned .relic-icon,
+.codex-relic-card.unowned .relic-name {
+    filter: grayscale(100%);
+}
+
+.codex-relic-card .relic-icon {
+    font-size: 1.8rem;
+    margin-bottom: 4px;
+}
+
+.codex-relic-card .relic-name {
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.codex-relic-card .relic-quality {
+    font-size: 0.65rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.codex-relic-card .relic-attr {
+    font-size: 0.6rem;
+    color: #4ade80;
+}
+
+.codex-relic-card .relic-hint {
+    font-size: 0.6rem;
+    color: #6b7280;
+}
+
+.codex-relic-card .relic-level {
+    font-size: 0.65rem;
+    color: #fbbf24;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.codex-relic-card .relic-locked {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 1.5rem;
+    opacity: 0.5;
+}
+
+/* 遗宝详情弹窗 */
+.relic-status {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.relic-status.owned {
+    background: #166534;
+    color: #4ade80;
+}
+
+.relic-status.unowned {
+    background: #525252;
+    color: #a3a3a3;
+}
+
+.attr-name {
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 4px;
+}
+
+.attr-value {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.attr-unknown {
+    color: #666;
+    font-style: italic;
+}
+
+.attr-hint {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+/* Abyss Tab Overview */
+#abyss-overview-progress {
+    color: #7c3aed;
+    font-weight: bold;
+}
+
+#abyss-bonus-preview {
+    background: #1a1a2e;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+/* Abyss Boss Entity in Combat */
+.abyss-boss-entity {
+    background: radial-gradient(circle, #7c3aed, #4c1d95);
+    border: 3px solid #a78bfa;
+    width: 100px;
+    height: 100px;
+    font-size: 3rem;
+    box-shadow: 0 0 40px #7c3aed, 0 0 80px #4c1d95;
+    z-index: 15;
+    animation: abyss-boss-pulse 2s infinite;
+    margin-top: -20px;
+}
+
+@keyframes abyss-boss-pulse {
+    0% { transform: scale(1); box-shadow: 0 0 30px #7c3aed, 0 0 60px #4c1d95; }
+    50% { transform: scale(1.05); box-shadow: 0 0 50px #8b5cf6, 0 0 100px #7c3aed; }
+    100% { transform: scale(1); box-shadow: 0 0 30px #7c3aed, 0 0 60px #4c1d95; }
+}

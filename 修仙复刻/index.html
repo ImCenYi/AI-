@@ -24,7 +24,10 @@
         <div class="stat-row"><span>攻击力:</span> <span id="stat-atk" class="val">50</span></div>
         <div class="stat-row"><span>暴击率:</span> <span id="stat-crit" class="val">0%</span></div>
         
-        <div class="panel-title" style="margin-top:10px;">加成统计</div>
+        <div class="panel-title" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+            <span>加成统计</span>
+            <button class="sys-btn" style="padding:2px 8px; font-size:0.7rem;" onclick="game.openStatsDetailModal()">📊 详情</button>
+        </div>
         <div class="stat-row"><span>境界加成:</span> <span id="mul-realm" class="val">x1.00</span></div>
         <div class="stat-row"><span>法则倍率:</span> <span id="mul-atk" class="val">100%</span> (攻/血)</div>
         <div class="stat-row"><span>通天塔掉率:</span> <span id="mul-drop" class="val">0%</span></div>
@@ -87,6 +90,7 @@
             <button class="tab-btn" onclick="game.switchTab('dungeon')">🔥 副本探险</button>
             <button class="tab-btn" onclick="game.switchTab('realm')">✨ 境界突破</button>
             <button class="tab-btn" onclick="game.switchTab('garden')">🌿 百草灵园</button>
+            <button class="tab-btn" onclick="game.switchTab('abyss')">🌑 深渊遗宝</button>
         </div>
 
         <!-- Law Cultivation Tab (法则悟道 - 合并法则修炼+通天塔) -->
@@ -129,17 +133,16 @@
                 <div class="sub-stat">当前进度: <span id="dungeon-status">未开启</span></div>
                 <div class="sub-stat">自动倒计时: <span id="dungeon-timer">--</span></div>
                 
-                <!-- 层数选择 -->
+                <!-- 层数选择 - 无限层数 -->
                 <div style="margin: 10px 0; padding: 8px; background: #1a1a1a; border-radius: 5px;">
-                    <div style="font-size: 0.75rem; color: #888; margin-bottom: 5px;">选择层数 (点击切换):</div>
-                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
-                        <button id="dungeon-tier-1" class="tier-btn" onclick="game.dungeon.setTier(1)" style="flex: 1; padding: 5px; background: #e65100; border: none; color: white; border-radius: 3px; cursor: pointer;">T1</button>
-                        <button id="dungeon-tier-2" class="tier-btn" onclick="game.dungeon.setTier(2)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T2🔒</button>
-                        <button id="dungeon-tier-3" class="tier-btn" onclick="game.dungeon.setTier(3)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T3🔒</button>
-                        <button id="dungeon-tier-4" class="tier-btn" onclick="game.dungeon.setTier(4)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T4🔒</button>
-                        <button id="dungeon-tier-5" class="tier-btn" onclick="game.dungeon.setTier(5)" style="flex: 1; padding: 5px; background: #333; border: none; color: #666; border-radius: 3px; cursor: not-allowed;" disabled>T5🔒</button>
+                    <div style="font-size: 0.75rem; color: #888; margin-bottom: 5px;">输入层数 (T-A):</div>
+                    <div style="display: flex; gap: 5px; align-items: center;">
+                        <span style="color: #888;">T-</span>
+                        <input type="number" id="dungeon-tier-input" value="1" min="1" style="flex: 1; padding: 5px 8px; background: #262626; border: 1px solid #444; color: #fff; border-radius: 3px; font-size: 0.9rem; width: 60px;">
+                        <button onclick="game.dungeon.setTierFromInput()" style="padding: 5px 12px; background: #e65100; border: none; color: white; border-radius: 3px; cursor: pointer; font-size: 0.8rem;">前往</button>
                     </div>
-                    <div id="dungeon-unlock-hint" style="font-size: 0.7rem; color: #ff9800; margin-top: 5px;"></div>
+                    <div id="dungeon-recommend-tier" style="font-size: 0.7rem; color: #4ade80; margin-top: 5px;">推荐层数: T1</div>
+                    <div id="dungeon-unlock-hint" style="font-size: 0.7rem; color: #ff9800; margin-top: 3px;"></div>
                 </div>
                 
                 <button class="sys-btn btn-dungeon" id="btn-dungeon-toggle" onclick="game.toggleDungeonMode()">🔥 进入副本</button>
@@ -227,6 +230,46 @@
                     * 灵植自动生长，收获获得灵石<br>
                     * 灵植经验自动转化为法则真意<br>
                     * 傀儡托管自动收获和种植
+                </div>
+            </div>
+        </div>
+        
+        <!-- Abyss Relic Tab (深渊遗宝) -->
+        <div id="tab-abyss" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#8b5cf6;">🌑 深渊遗宝</div>
+                
+                <!-- 收集进度 -->
+                <div class="sub-stat">
+                    <span>收集进度:</span>
+                    <span id="abyss-overview-progress" class="val highlight">0/0 (0%)</span>
+                </div>
+                
+                <!-- 遗宝碎片 -->
+                <div class="sub-stat">
+                    <span>遗宝碎片:</span>
+                    <span id="abyss-overview-fragments" class="val highlight" style="color:#fbbf24;">0</span>
+                </div>
+                
+                <!-- 属性加成预览 -->
+                <div id="abyss-bonus-preview" style="margin:10px 0; padding:10px; background:rgba(139,92,246,0.1); border-radius:6px; font-size:0.85rem;">
+                    <div style="color:#888;">暂无属性加成</div>
+                </div>
+                
+                <!-- 进入深渊战场按钮 -->
+                <button class="sys-btn" onclick="game.openAbyssModal()" style="margin-top:10px; background:linear-gradient(to right, #7c3aed, #8b5cf6);">
+                    ⚔️ 深渊战场
+                </button>
+                
+                <!-- 遗宝图鉴按钮 -->
+                <button class="sys-btn" onclick="game.openAbyssCodex()" style="margin-top:10px; background:linear-gradient(to right, #0891b2, #06b6d4);">
+                    📚 遗宝图鉴
+                </button>
+                
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 挑战深渊BOSS获取遗宝<br>
+                    * 遗宝可升级，满级自动分解<br>
+                    * 碎片可兑换任意遗宝
                 </div>
             </div>
         </div>
@@ -393,6 +436,165 @@
     </div>
 </div>
 
+<!-- Abyss Battle Modal (深渊战场) -->
+<div id="abyss-modal" class="game-modal">
+    <div class="modal-content" style="width: 90%; max-width: 600px; height: 90%; display: flex; flex-direction: column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
+            <h2 style="margin:0; color:#8b5cf6;">🌑 深渊战场</h2>
+            <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeAbyssModal()">✕</button>
+        </div>
+        
+        <div style="flex:1; overflow-y:auto; padding-right:5px;">
+            <div style="background:#1a1a1a; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <div style="color:#888; font-size:0.85rem; margin-bottom:10px;">
+                    👇 点击下方按钮直接挑战BOSS
+                </div>
+                <div id="boss-select-list" style="display:flex; flex-direction:column; gap:10px;">
+                    <!-- 由JS生成 -->
+                </div>
+            </div>
+            
+            <!-- 收集进度 -->
+            <div style="background:#1a1a1a; padding:15px; border-radius:8px; margin-bottom:15px;">
+                <div id="abyss-total-progress" style="color:#a78bfa; font-size:0.9rem;">
+                    📚 遗宝收集：0/0 (0%)
+                </div>
+            </div>
+            
+            <!-- 图鉴按钮 -->
+            <button class="sys-btn" onclick="game.openAbyssCodex()" style="background:linear-gradient(to right, #0891b2, #06b6d4); width:100%;">
+                📚 查看遗宝图鉴
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Abyss Codex Modal (遗宝图鉴) -->
+<div id="abyss-codex-modal" class="game-modal">
+    <div class="modal-content" style="width: 90%; max-width: 900px; height: 90%; display: flex; flex-direction: column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #444; padding-bottom:10px; margin-bottom:10px;">
+            <h2 style="margin:0; color:#8b5cf6;">📚 遗宝图鉴</h2>
+            <button class="modal-btn btn-close" style="width:auto; margin:0;" onclick="game.closeAbyssCodex()">✕</button>
+        </div>
+        
+        <!-- BOSS标签页 -->
+        <div id="boss-tabs" style="display:flex; gap:5px; margin-bottom:10px; overflow-x:auto;">
+            <!-- 由JS生成 -->
+        </div>
+        
+        <!-- 收集进度 -->
+        <div id="collection-progress" style="margin-bottom:10px; padding:10px; background:#1a1a1a; border-radius:6px;">
+            <!-- 由JS生成 -->
+        </div>
+        
+        <!-- 遗宝网格 -->
+        <div id="relic-collection-grid" style="flex:1; display:grid; grid-template-columns: repeat(auto-fill, minmax(95px, 1fr)); gap:12px; overflow-y:auto; background:#1a1a1a; border-radius:8px; padding:12px;">
+            <!-- 由JS生成 -->
+        </div>
+    </div>
+</div>
+
+<!-- Stats Detail Modal -->
+<div id="stats-detail-modal" class="game-modal">
+    <div class="modal-content" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+        <h3 style="margin-top:0; color:#fbbf24;">📊 属性详情面板</h3>
+        
+        <!-- 最终属性 -->
+        <div style="background: linear-gradient(135deg, #fbbf2420 0%, #f59f0b20 100%); border: 1px solid #fbbf24; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+            <div style="color: #fbbf24; font-weight: bold; margin-bottom: 10px; font-size: 1.1rem;">⚔️ 最终战斗属性</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                    <div style="color: #888; font-size: 0.75rem;">生命值</div>
+                    <div id="detail-final-hp" style="color: #4ade80; font-weight: bold; font-size: 0.9rem;">-</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                    <div style="color: #888; font-size: 0.75rem;">攻击力</div>
+                    <div id="detail-final-atk" style="color: #f87171; font-weight: bold; font-size: 0.9rem;">-</div>
+                </div>
+                <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 8px;">
+                    <div style="color: #888; font-size: 0.75rem;">暴击率</div>
+                    <div id="detail-final-crit" style="color: #fbbf24; font-weight: bold; font-size: 0.9rem;">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 各系统加成详情 -->
+        <div style="display: grid; gap: 12px;">
+            
+            <!-- 基础属性 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">📊 基础属性</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
+                    <div>生命: <span id="detail-base-hp" class="val">-</span></div>
+                    <div>攻击: <span id="detail-base-atk" class="val">-</span></div>
+                    <div>暴击: <span id="detail-base-crit" class="val">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 境界加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">✨ 境界加成</div>
+                <div style="font-size: 0.8rem;">
+                    <div>当前境界: <span id="detail-realm-name" class="val" style="color:#c084fc">-</span></div>
+                    <div>境界倍率: <span id="detail-realm-bonus" class="val" style="color:#fbbf24">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 装备加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">🛡️ 装备加成 (12件)</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
+                    <div>装备攻击: <span id="detail-equip-atk" class="val">-</span></div>
+                    <div>装备生命: <span id="detail-equip-hp" class="val">-</span></div>
+                    <div>装备暴击: <span id="detail-equip-crit" class="val">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 法则加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">☯️ 法则悟道</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
+                    <div>攻击倍率: <span id="detail-law-atk" class="val" style="color:#60a5fa">-</span></div>
+                    <div>生命倍率: <span id="detail-law-hp" class="val" style="color:#60a5fa">-</span></div>
+                    <div>当前轮次: <span id="detail-law-round" class="val">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 秘宝加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">🔮 秘宝加成 (6槽位)</div>
+                <div style="font-size: 0.8rem;">
+                    <div>全属性倍率: <span id="detail-treasure-mult" class="val" style="color:#fbbf24">-</span></div>
+                    <div>丹药倍率: <span id="detail-treasure-pill" class="val" style="color:#fbbf24">-</span></div>
+                    <div>爬塔掉率: <span id="detail-treasure-tower" class="val" style="color:#fbbf24">-</span></div>
+                    <div id="detail-treasure-list" style="color: #666; font-size: 0.75rem; margin-top: 5px;">-</div>
+                </div>
+            </div>
+            
+            <!-- 遗宝加成 -->
+            <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">🌑 深渊遗宝</div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
+                    <div>全属性倍率: <span id="detail-relic-stat" class="val" style="color:#ef4444">-</span></div>
+                    <div>爬塔掉率: <span id="detail-relic-tower" class="val" style="color:#ef4444">-</span></div>
+                    <div>刷丹倍率: <span id="detail-relic-pill" class="val" style="color:#ef4444">-</span></div>
+                    <div>装备等级: <span id="detail-relic-equip" class="val" style="color:#f59f0b">-</span></div>
+                    <div>秘宝等级: <span id="detail-relic-treasure" class="val" style="color:#f59f0b">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 计算说明 -->
+            <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; font-size: 0.75rem; color: #666;">
+                <div style="color: #888; margin-bottom: 5px;">📝 计算公式</div>
+                <div>最终攻击 = (基础攻击 + 装备攻击) × 法则攻击倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成</div>
+                <div>最终生命 = (基础生命 + 装备生命) × 法则生命倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成</div>
+            </div>
+        </div>
+        
+        <button class="modal-btn btn-close" onclick="game.closeModal('stats-detail-modal')" style="margin-top: 15px;">关闭</button>
+    </div>
+</div>
+
 <!-- Cheat Modal -->
 <div id="cheat-modal" class="game-modal">
     <div class="modal-content">
@@ -409,6 +611,8 @@
             <option value="diff">增加历史最高难度</option>
             <option value="gardenExp">灵植经验倍率</option>
             <option value="gardenStone">灵植灵石倍率</option>
+            <option value="abyssFrag">深渊遗宝碎片</option>
+            <option value="currentDiff">当前主线难度</option>
         </select>
         <input type="text" id="cheat-val" class="cheat-input" placeholder="输入数值 (支持 1e100)">
         <div style="font-size:0.8rem; color:#888;">支持极大数值，输入过大将变为∞</div>
@@ -425,6 +629,8 @@
 <script src="js/classes/Treasure.js"></script>
 <script src="js/classes/Dungeon.js"></script>
 <script src="js/classes/SpiritGarden.js"></script>
+<script src="js/classes/AbyssRelic.js"></script>
+<script src="js/classes/AbyssDungeon.js"></script>
 <script src="js/game/Game.js"></script>
 
 <!-- Initialize Game -->

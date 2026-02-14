@@ -1,5 +1,10 @@
 /**
- * Dungeon Class - Dungeon system management
+ * Dungeon Class - 副本系统管理
+ * 
+ * 战斗模式：数值压缩模式敌人
+ * - 使用对数压缩处理极大数值
+ * - 玩家攻击压缩：(log10(攻击))^2
+ * - 敌人伤害换算：伤害比例 = 敌人攻击 / 玩家压缩生命
  */
 
 class Dungeon {
@@ -44,8 +49,9 @@ class Dungeon {
 
     start() {
         this.active = true;
-        // 副本难度 = 基础难度 * 层数倍率
-        this.level = this.game.difficulty * this.tier; 
+        // 副本难度 = 层数（T1=1, T2=2, T3=3...）
+        // 与主线难度完全独立
+        this.level = this.tier; 
         this.wave = 0;
         this.game.enemies = [];
         this.spawnEventsScheduled = 0;
@@ -165,6 +171,7 @@ class Dungeon {
         const statusEl = document.getElementById('dungeon-status');
         const timerEl = document.getElementById('dungeon-timer');
         const tierEl = document.getElementById('dungeon-tier');
+        const tierInput = document.getElementById('dungeon-tier-input');
         
         if (statusEl) {
             if (!this.isUnlocked(this.tier)) {
@@ -175,31 +182,96 @@ class Dungeon {
         }
         if (timerEl) timerEl.innerText = this.timeRemaining > 0 ? `${this.timeRemaining}s` : "--";
         if (tierEl) tierEl.innerText = `T${this.tier}`;
+        if (tierInput) tierInput.value = this.tier;
         
-        // 更新层数选择按钮状态
-        this.updateTierButtons();
+        // 更新层数选择UI
+        this.updateTierUI();
     }
 
-    updateTierButtons() {
-        for (let t = 1; t <= MAX_DUNGEON_TIER; t++) {
-            const btn = document.getElementById(`dungeon-tier-${t}`);
-            if (btn) {
-                const unlocked = this.isUnlocked(t);
-                btn.classList.toggle('locked', !unlocked);
-                btn.classList.toggle('active', this.tier === t && unlocked);
-                btn.disabled = !unlocked;
+    // 新的层数选择UI更新
+    updateTierUI() {
+        const input = document.getElementById('dungeon-tier-input');
+        const hintEl = document.getElementById('dungeon-unlock-hint');
+        const recommendEl = document.getElementById('dungeon-recommend-tier');
+        
+        if (input) {
+            // 检查当前输入的层数是否解锁
+            const inputTier = parseInt(input.value) || 1;
+            if (!this.isUnlocked(inputTier)) {
+                input.style.borderColor = '#f87171'; // 红色边框表示未解锁
+                if (hintEl) {
+                    hintEl.innerText = `🔒 T${inputTier}需主线N${getDungeonUnlockRequirement(inputTier)}解锁`;
+                }
+            } else {
+                input.style.borderColor = this.tier === inputTier ? '#4ade80' : '#444'; // 绿色表示当前选中
+                if (hintEl) hintEl.innerText = '';
             }
+        }
+        
+        // 更新推荐层数
+        if (recommendEl) {
+            const recommended = this.calculateRecommendedTier();
+            recommendEl.innerText = `💡 推荐层数: T${recommended} (基于您当前的实力)`;
         }
     }
 
+    // 计算推荐层数 - 基于玩家当前实力
+    calculateRecommendedTier() {
+        // 获取玩家总属性
+        const stats = this.game.getTotalStats();
+        const playerAtk = stats.atk;
+        const playerHp = stats.maxHp;
+        
+        // 使用对数计算玩家实力指数
+        // log10(攻击) + log10(生命) / 2
+        const playerPower = Math.log10(playerAtk.m) + playerAtk.e + 
+                           (Math.log10(playerHp.m) + playerHp.e) / 2;
+        
+        // 副本难度指数 = T * 0.5 (每增加1层，指数增加0.5)
+        // 推荐层数 = (玩家实力指数 - 基础值) / 0.5
+        // 基础值设为4 (对应N100左右的玩家)
+        const basePower = 4;
+        const powerPerTier = 0.5;
+        
+        let recommendedTier = Math.floor((playerPower - basePower) / powerPerTier);
+        
+        // 确保在合理范围内
+        recommendedTier = Math.max(1, recommendedTier);
+        
+        // 检查是否解锁
+        while (recommendedTier > 1 && !this.isUnlocked(recommendedTier)) {
+            recommendedTier--;
+        }
+        
+        return recommendedTier;
+    }
+
+    // 从输入框设置层数
+    setTierFromInput() {
+        const input = document.getElementById('dungeon-tier-input');
+        if (!input) return false;
+        
+        const tier = parseInt(input.value);
+        if (isNaN(tier) || tier < 1) {
+            this.game.log('SYS', '请输入有效的层数(>=1)');
+            return false;
+        }
+        
+        return this.setTier(tier);
+    }
+
     setTier(tier) {
-        if (tier < 1 || tier > MAX_DUNGEON_TIER) return false;
+        if (tier < 1 || tier > MAX_DUNGEON_TIER) {
+            this.game.log('SYS', `层数必须在1-${MAX_DUNGEON_TIER}之间`);
+            return false;
+        }
         if (!this.isUnlocked(tier)) {
             this.game.log('SYS', `副本T${tier}需主线N${getDungeonUnlockRequirement(tier)}解锁！`);
             return false;
         }
         this.tier = tier;
         this.updateUI();
+        this.game.log('SYS', `已切换到副本T${tier}`);
         return true;
     }
 }

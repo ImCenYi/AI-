@@ -74,13 +74,14 @@ const DUNGEON_HP_INC = 100;
 
 // Dungeon Unlock Requirements
 // T1: N100, T2: N300, T3: N600, T4: N900... TX: N300*(X-1) for X>=2
+// 支持无限层数，无上限
 function getDungeonUnlockRequirement(tier) {
     if (tier <= 0) return 0;
     if (tier === 1) return 100;
     return 300 * (tier - 1);
 }
 
-const MAX_DUNGEON_TIER = 5; // 最大副本层数 T1-T5
+const MAX_DUNGEON_TIER = 999999; // 理论上支持无限层数
 
 // Realm Breakthrough Configuration (境界突破)
 const REALM_TABLE = [
@@ -258,6 +259,322 @@ try {
             TREASURE_SLOTS, TREASURE_QUALITIES, TREASURE_ATTRS,
             QUALITIES, ENEMY_TYPES, TOWER_TYPES,
             DUNGEON_TYPES, DUNGEON_N1_MULT, DUNGEON_ATK_INC, DUNGEON_HP_INC
+        };
+    }
+} catch (e) {}
+
+// ==================== 深渊遗宝系统配置 ====================
+
+// 深渊BOSS配置
+const ABYSS_BOSSES = [
+    {
+        id: 'dragon_lord',
+        name: '深渊魔龙',
+        emoji: '🐉',
+        level: 1,
+        unlockDifficulty: 50,
+        reviveTime: 60,
+        color: '#ff4444',
+        description: '深渊入口的守护者',
+        targetKillTime: 40,
+        targetSurviveTime: 50,
+        dpsMultiplier: 1.0
+    },
+    {
+        id: 'demon_king',
+        name: '深渊魔王',
+        emoji: '👹',
+        level: 2,
+        unlockDifficulty: 150,
+        reviveTime: 90,
+        color: '#ff6600',
+        description: '掌控深渊魔气',
+        targetKillTime: 45,
+        targetSurviveTime: 55,
+        dpsMultiplier: 1.0
+    },
+    {
+        id: 'void_beast',
+        name: '虚空巨兽',
+        emoji: '👾',
+        level: 3,
+        unlockDifficulty: 300,
+        reviveTime: 120,
+        color: '#9c27b0',
+        description: '来自虚空维度',
+        targetKillTime: 50,
+        targetSurviveTime: 60,
+        dpsMultiplier: 1.0
+    },
+    {
+        id: 'ancient_god',
+        name: '远古邪神',
+        emoji: '👿',
+        level: 4,
+        unlockDifficulty: 500,
+        reviveTime: 180,
+        color: '#ffd700',
+        description: '被封印的远古神明',
+        targetKillTime: 55,
+        targetSurviveTime: 65,
+        dpsMultiplier: 1.0
+    },
+    {
+        id: 'chaos_overlord',
+        name: '混沌主宰',
+        emoji: '🌑',
+        level: 5,
+        unlockDifficulty: 800,
+        reviveTime: 300,
+        color: '#ff1744',
+        description: '深渊之主',
+        targetKillTime: 60,
+        targetSurviveTime: 70,
+        dpsMultiplier: 1.0
+    }
+];
+
+// 遗宝品质配置
+const RELIC_QUALITIES = {
+    'N': { 
+        name: 'N', 
+        color: '#9ca3af', 
+        weight: 400, 
+        border: '2px solid #9ca3af', 
+        multiplier: 0.5,
+        maxLevel: 100,
+        overflowPoints: 10,
+        exchangeCost: 100
+    },
+    'R': { 
+        name: 'R', 
+        color: '#60a5fa', 
+        weight: 320, 
+        border: '2px solid #60a5fa', 
+        multiplier: 1,
+        maxLevel: 80,
+        overflowPoints: 20,
+        exchangeCost: 200
+    },
+    'SR': { 
+        name: 'SR', 
+        color: '#c084fc', 
+        weight: 200, 
+        border: '2px solid #c084fc', 
+        multiplier: 2.5,
+        maxLevel: 50,
+        overflowPoints: 50,
+        exchangeCost: 500
+    },
+    'SSR': { 
+        name: 'SSR', 
+        color: '#facc15', 
+        weight: 120, 
+        border: '2px solid #facc15', 
+        multiplier: 6,
+        maxLevel: 30,
+        overflowPoints: 100,
+        exchangeCost: 1000
+    },
+    'UR': { 
+        name: 'UR', 
+        color: '#ef4444', 
+        weight: 30, 
+        border: '2px solid #ef4444', 
+        multiplier: 15,
+        maxLevel: 10,
+        overflowPoints: 300,
+        exchangeCost: 3000
+    }
+};
+
+// 遗宝属性类型配置
+const RELIC_ATTR_TYPES = [
+    { 
+        id: 'all_stat_mult', 
+        name: '全属性倍率', 
+        suffix: '', 
+        desc: '攻击和生命指数加成，遗宝之间相乘',
+        calcType: 'multiplicative',
+        baseValue: 0.02
+    },
+    { 
+        id: 'tower_drop_rate', 
+        name: '爬塔掉率', 
+        suffix: '', 
+        desc: '通天塔法则真意掉落数量指数级提升，遗宝相乘',
+        calcType: 'multiplicative',
+        baseValue: 0.03
+    },
+    { 
+        id: 'pill_effect_mult', 
+        name: '刷丹倍率', 
+        suffix: '', 
+        desc: '主线丹药使用效果指数级倍增，遗宝相乘',
+        calcType: 'multiplicative',
+        baseValue: 0.04
+    },
+    { 
+        id: 'equip_level_boost', 
+        name: '装备等级', 
+        suffix: '', 
+        desc: '主线装备等级线性提升，遗宝相加',
+        calcType: 'additive',
+        baseValue: 0.006
+    },
+    { 
+        id: 'treasure_level_boost', 
+        name: '秘宝等级', 
+        suffix: '', 
+        desc: '秘宝副本掉落等级线性提升，遗宝相加',
+        calcType: 'additive',
+        baseValue: 0.006
+    }
+];
+
+// 遗宝基础数值
+const RELIC_BASE_VALUES = {
+    'all_stat_mult': 0.02,
+    'tower_drop_rate': 0.03,
+    'pill_effect_mult': 0.04,
+    'equip_level_boost': 0.006,
+    'treasure_level_boost': 0.006
+};
+
+// 遗宝池配置
+const ABYSS_RELIC_POOLS = {
+    'dragon_lord': [
+        { id: 'relic_dl_01', name: '深渊龙核', quality: 'UR', icon: '💎', attrType: 'all_stat_mult' },
+        { id: 'relic_dl_02', name: '龙神之赐', quality: 'UR', icon: '👑', attrType: 'pill_effect_mult' },
+        { id: 'relic_dl_03', name: '魔龙宝藏', quality: 'UR', icon: '🏆', attrType: 'equip_level_boost' },
+        { id: 'relic_dl_04', name: '龙鳞甲片', quality: 'SSR', icon: '🛡️', attrType: 'all_stat_mult' },
+        { id: 'relic_dl_05', name: '龙血精华', quality: 'SSR', icon: '🩸', attrType: 'pill_effect_mult' },
+        { id: 'relic_dl_06', name: '龙眼宝珠', quality: 'SSR', icon: '👁️', attrType: 'tower_drop_rate' },
+        { id: 'relic_dl_07', name: '龙爪锐刃', quality: 'SSR', icon: '⚔️', attrType: 'equip_level_boost' },
+        { id: 'relic_dl_08', name: '龙骨', quality: 'SR', icon: '🦴', attrType: 'all_stat_mult' },
+        { id: 'relic_dl_09', name: '龙牙', quality: 'SR', icon: '🦷', attrType: 'pill_effect_mult' },
+        { id: 'relic_dl_10', name: '龙皮', quality: 'SR', icon: '🐉', attrType: 'tower_drop_rate' },
+        { id: 'relic_dl_11', name: '龙翼', quality: 'SR', icon: '🪶', attrType: 'equip_level_boost' },
+        { id: 'relic_dl_12', name: '龙尾', quality: 'SR', icon: '🐲', attrType: 'treasure_level_boost' },
+        { id: 'relic_dl_13', name: '龙鳞碎片', quality: 'R', icon: '🔷', attrType: 'all_stat_mult' },
+        { id: 'relic_dl_14', name: '龙血残滴', quality: 'R', icon: '💧', attrType: 'pill_effect_mult' },
+        { id: 'relic_dl_15', name: '龙息结晶', quality: 'R', icon: '🔥', attrType: 'tower_drop_rate' },
+        { id: 'relic_dl_16', name: '龙骨粉末', quality: 'R', icon: '⚪', attrType: 'equip_level_boost' },
+        { id: 'relic_dl_17', name: '龙筋', quality: 'R', icon: '🧵', attrType: 'treasure_level_boost' },
+        { id: 'relic_dl_18', name: '龙鳞碎屑', quality: 'N', icon: '⚪', attrType: 'all_stat_mult' },
+        { id: 'relic_dl_19', name: '龙血微尘', quality: 'N', icon: '✨', attrType: 'pill_effect_mult' },
+        { id: 'relic_dl_20', name: '龙息余热', quality: 'N', icon: '🔥', attrType: 'tower_drop_rate' },
+        { id: 'relic_dl_21', name: '龙骨残渣', quality: 'N', icon: '🦴', attrType: 'equip_level_boost' },
+        { id: 'relic_dl_22', name: '龙筋细丝', quality: 'N', icon: '🧶', attrType: 'treasure_level_boost' }
+    ],
+    'demon_king': [
+        { id: 'relic_dk_01', name: '魔王之心', quality: 'UR', icon: '🖤', attrType: 'all_stat_mult' },
+        { id: 'relic_dk_02', name: '魔王权杖', quality: 'UR', icon: '👑', attrType: 'tower_drop_rate' },
+        { id: 'relic_dk_03', name: '魔王宝库', quality: 'UR', icon: '🏆', attrType: 'treasure_level_boost' },
+        { id: 'relic_dk_04', name: '魔角', quality: 'SSR', icon: '👿', attrType: 'all_stat_mult' },
+        { id: 'relic_dk_05', name: '魔翼', quality: 'SSR', icon: '🦇', attrType: 'tower_drop_rate' },
+        { id: 'relic_dk_06', name: '魔爪', quality: 'SSR', icon: '🔥', attrType: 'pill_effect_mult' },
+        { id: 'relic_dk_07', name: '魔甲', quality: 'SSR', icon: '🛡️', attrType: 'treasure_level_boost' },
+        { id: 'relic_dk_08', name: '魔眼', quality: 'SR', icon: '👁️', attrType: 'all_stat_mult' },
+        { id: 'relic_dk_09', name: '魔牙', quality: 'SR', icon: '🦷', attrType: 'tower_drop_rate' },
+        { id: 'relic_dk_10', name: '魔血', quality: 'SR', icon: '🩸', attrType: 'pill_effect_mult' },
+        { id: 'relic_dk_11', name: '魔鳞', quality: 'SR', icon: '🔷', attrType: 'equip_level_boost' },
+        { id: 'relic_dk_12', name: '魔尾', quality: 'SR', icon: '🐲', attrType: 'treasure_level_boost' },
+        { id: 'relic_dk_13', name: '魔角碎片', quality: 'R', icon: '⚪', attrType: 'all_stat_mult' },
+        { id: 'relic_dk_14', name: '魔翼残片', quality: 'R', icon: '🪶', attrType: 'tower_drop_rate' },
+        { id: 'relic_dk_15', name: '魔爪断刃', quality: 'R', icon: '⚔️', attrType: 'pill_effect_mult' },
+        { id: 'relic_dk_16', name: '魔甲碎片', quality: 'R', icon: '🛡️', attrType: 'equip_level_boost' },
+        { id: 'relic_dk_17', name: '魔眼碎片', quality: 'R', icon: '🔮', attrType: 'treasure_level_boost' },
+        { id: 'relic_dk_18', name: '魔角微尘', quality: 'N', icon: '✨', attrType: 'all_stat_mult' },
+        { id: 'relic_dk_19', name: '魔翼粉尘', quality: 'N', icon: '🌫️', attrType: 'tower_drop_rate' },
+        { id: 'relic_dk_20', name: '魔爪碎屑', quality: 'N', icon: '🔥', attrType: 'pill_effect_mult' },
+        { id: 'relic_dk_21', name: '魔甲粉末', quality: 'N', icon: '⚪', attrType: 'equip_level_boost' },
+        { id: 'relic_dk_22', name: '魔眼残渣', quality: 'N', icon: '👁️', attrType: 'treasure_level_boost' }
+    ],
+    'void_beast': [
+        { id: 'relic_vb_01', name: '虚空核心', quality: 'UR', icon: '🌌', attrType: 'all_stat_mult' },
+        { id: 'relic_vb_02', name: '虚空之眼', quality: 'UR', icon: '👁️', attrType: 'pill_effect_mult' },
+        { id: 'relic_vb_03', name: '虚空宝藏', quality: 'UR', icon: '💎', attrType: 'equip_level_boost' },
+        { id: 'relic_vb_04', name: '虚空触须', quality: 'SSR', icon: '🦑', attrType: 'all_stat_mult' },
+        { id: 'relic_vb_05', name: '虚空鳞片', quality: 'SSR', icon: '🔷', attrType: 'pill_effect_mult' },
+        { id: 'relic_vb_06', name: '虚空之牙', quality: 'SSR', icon: '🦷', attrType: 'tower_drop_rate' },
+        { id: 'relic_vb_07', name: '虚空之翼', quality: 'SSR', icon: '🪶', attrType: 'equip_level_boost' },
+        { id: 'relic_vb_08', name: '虚空血液', quality: 'SR', icon: '🩸', attrType: 'all_stat_mult' },
+        { id: 'relic_vb_09', name: '虚空骨骼', quality: 'SR', icon: '🦴', attrType: 'pill_effect_mult' },
+        { id: 'relic_vb_10', name: '虚空精华', quality: 'SR', icon: '✨', attrType: 'tower_drop_rate' },
+        { id: 'relic_vb_11', name: '虚空皮肤', quality: 'SR', icon: '🐉', attrType: 'equip_level_boost' },
+        { id: 'relic_vb_12', name: '虚空心脏', quality: 'SR', icon: '💖', attrType: 'treasure_level_boost' },
+        { id: 'relic_vb_13', name: '虚空触须残段', quality: 'R', icon: '🧵', attrType: 'all_stat_mult' },
+        { id: 'relic_vb_14', name: '虚空鳞片碎片', quality: 'R', icon: '🔹', attrType: 'pill_effect_mult' },
+        { id: 'relic_vb_15', name: '虚空之牙断片', quality: 'R', icon: '🦴', attrType: 'tower_drop_rate' },
+        { id: 'relic_vb_16', name: '虚空之翼残羽', quality: 'R', icon: '🪶', attrType: 'equip_level_boost' },
+        { id: 'relic_vb_17', name: '虚空血液滴', quality: 'R', icon: '💧', attrType: 'treasure_level_boost' },
+        { id: 'relic_vb_18', name: '虚空触须微尘', quality: 'N', icon: '✨', attrType: 'all_stat_mult' },
+        { id: 'relic_vb_19', name: '虚空鳞片粉末', quality: 'N', icon: '⚪', attrType: 'pill_effect_mult' },
+        { id: 'relic_vb_20', name: '虚空之牙碎屑', quality: 'N', icon: '🦷', attrType: 'tower_drop_rate' },
+        { id: 'relic_vb_21', name: '虚空之翼粉尘', quality: 'N', icon: '🌫️', attrType: 'equip_level_boost' },
+        { id: 'relic_vb_22', name: '虚空血液残渍', quality: 'N', icon: '🩸', attrType: 'treasure_level_boost' }
+    ],
+    'ancient_god': [
+        { id: 'relic_ag_01', name: '邪神之眼', quality: 'UR', icon: '👁️', attrType: 'all_stat_mult' },
+        { id: 'relic_ag_02', name: '邪神之触', quality: 'UR', icon: '🦑', attrType: 'tower_drop_rate' },
+        { id: 'relic_ag_03', name: '邪神宝藏', quality: 'UR', icon: '🏆', attrType: 'treasure_level_boost' },
+        { id: 'relic_ag_04', name: '邪神之角', quality: 'SSR', icon: '👿', attrType: 'all_stat_mult' },
+        { id: 'relic_ag_05', name: '邪神之翼', quality: 'SSR', icon: '🦇', attrType: 'tower_drop_rate' },
+        { id: 'relic_ag_06', name: '邪神之牙', quality: 'SSR', icon: '🦷', attrType: 'pill_effect_mult' },
+        { id: 'relic_ag_07', name: '邪神之甲', quality: 'SSR', icon: '🛡️', attrType: 'treasure_level_boost' },
+        { id: 'relic_ag_08', name: '邪神之血', quality: 'SR', icon: '🩸', attrType: 'all_stat_mult' },
+        { id: 'relic_ag_09', name: '邪神之骨', quality: 'SR', icon: '🦴', attrType: 'tower_drop_rate' },
+        { id: 'relic_ag_10', name: '邪神之鳞', quality: 'SR', icon: '🔷', attrType: 'pill_effect_mult' },
+        { id: 'relic_ag_11', name: '邪神之尾', quality: 'SR', icon: '🐲', attrType: 'equip_level_boost' },
+        { id: 'relic_ag_12', name: '邪神之爪', quality: 'SR', icon: '⚔️', attrType: 'treasure_level_boost' },
+        { id: 'relic_ag_13', name: '邪神之角碎片', quality: 'R', icon: '⚪', attrType: 'all_stat_mult' },
+        { id: 'relic_ag_14', name: '邪神之翼残片', quality: 'R', icon: '🪶', attrType: 'tower_drop_rate' },
+        { id: 'relic_ag_15', name: '邪神之牙断片', quality: 'R', icon: '🦷', attrType: 'pill_effect_mult' },
+        { id: 'relic_ag_16', name: '邪神之甲碎片', quality: 'R', icon: '🛡️', attrType: 'equip_level_boost' },
+        { id: 'relic_ag_17', name: '邪神之尾残段', quality: 'R', icon: '🧶', attrType: 'treasure_level_boost' },
+        { id: 'relic_ag_18', name: '邪神之角微尘', quality: 'N', icon: '✨', attrType: 'all_stat_mult' },
+        { id: 'relic_ag_19', name: '邪神之翼粉尘', quality: 'N', icon: '🌫️', attrType: 'tower_drop_rate' },
+        { id: 'relic_ag_20', name: '邪神之牙碎屑', quality: 'N', icon: '🔥', attrType: 'pill_effect_mult' },
+        { id: 'relic_ag_21', name: '邪神之甲粉末', quality: 'N', icon: '⚪', attrType: 'equip_level_boost' },
+        { id: 'relic_ag_22', name: '邪神之尾细丝', quality: 'N', icon: '🧵', attrType: 'treasure_level_boost' }
+    ],
+    'chaos_overlord': [
+        { id: 'relic_co_01', name: '混沌核心', quality: 'UR', icon: '🌑', attrType: 'all_stat_mult' },
+        { id: 'relic_co_02', name: '混沌之环', quality: 'UR', icon: '💫', attrType: 'pill_effect_mult' },
+        { id: 'relic_co_03', name: '混沌王座', quality: 'UR', icon: '👑', attrType: 'equip_level_boost' },
+        { id: 'relic_co_04', name: '混沌之眼', quality: 'SSR', icon: '👁️', attrType: 'all_stat_mult' },
+        { id: 'relic_co_05', name: '混沌之翼', quality: 'SSR', icon: '🦇', attrType: 'pill_effect_mult' },
+        { id: 'relic_co_06', name: '混沌之爪', quality: 'SSR', icon: '🔥', attrType: 'tower_drop_rate' },
+        { id: 'relic_co_07', name: '混沌之甲', quality: 'SSR', icon: '🛡️', attrType: 'equip_level_boost' },
+        { id: 'relic_co_08', name: '混沌之血', quality: 'SR', icon: '🩸', attrType: 'all_stat_mult' },
+        { id: 'relic_co_09', name: '混沌之骨', quality: 'SR', icon: '🦴', attrType: 'pill_effect_mult' },
+        { id: 'relic_co_10', name: '混沌之鳞', quality: 'SR', icon: '🔷', attrType: 'tower_drop_rate' },
+        { id: 'relic_co_11', name: '混沌之尾', quality: 'SR', icon: '🐲', attrType: 'equip_level_boost' },
+        { id: 'relic_co_12', name: '混沌之心', quality: 'SR', icon: '🖤', attrType: 'treasure_level_boost' },
+        { id: 'relic_co_13', name: '混沌之眼碎片', quality: 'R', icon: '🔮', attrType: 'all_stat_mult' },
+        { id: 'relic_co_14', name: '混沌之翼残片', quality: 'R', icon: '🪶', attrType: 'pill_effect_mult' },
+        { id: 'relic_co_15', name: '混沌之爪断刃', quality: 'R', icon: '⚔️', attrType: 'tower_drop_rate' },
+        { id: 'relic_co_16', name: '混沌之甲碎片', quality: 'R', icon: '🛡️', attrType: 'equip_level_boost' },
+        { id: 'relic_co_17', name: '混沌之血滴', quality: 'R', icon: '💧', attrType: 'treasure_level_boost' },
+        { id: 'relic_co_18', name: '混沌之眼微尘', quality: 'N', icon: '✨', attrType: 'all_stat_mult' },
+        { id: 'relic_co_19', name: '混沌之翼粉尘', quality: 'N', icon: '🌫️', attrType: 'pill_effect_mult' },
+        { id: 'relic_co_20', name: '混沌之爪碎屑', quality: 'N', icon: '🔥', attrType: 'tower_drop_rate' },
+        { id: 'relic_co_21', name: '混沌之甲粉末', quality: 'N', icon: '⚪', attrType: 'equip_level_boost' },
+        { id: 'relic_co_22', name: '混沌之血残渍', quality: 'N', icon: '🩸', attrType: 'treasure_level_boost' }
+    ]
+};
+
+// Update module exports
+try {
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {
+            SCALE_ENEMY, SCALE_EQUIP, SCALE_PILL, SCALE_TOWER_STR, SCALE_TOWER_DROP,
+            SLOTS_CONFIG, SLOT_KEYS,
+            TREASURE_SLOTS, TREASURE_QUALITIES, TREASURE_ATTRS,
+            QUALITIES, ENEMY_TYPES, TOWER_TYPES,
+            DUNGEON_TYPES, DUNGEON_N1_MULT, DUNGEON_ATK_INC, DUNGEON_HP_INC,
+            ABYSS_BOSSES, RELIC_QUALITIES, RELIC_ATTR_TYPES, RELIC_BASE_VALUES, ABYSS_RELIC_POOLS
         };
     }
 } catch (e) {}

@@ -29,6 +29,26 @@ class Game {
         this.towerLevel = 0;
         this.dungeon = new Dungeon(this);
         
+        // Abyss Relic System (深渊遗宝系统)
+        // 先检查配置是否可用
+        if (typeof ABYSS_BOSSES === 'undefined') {
+            console.error('Game: ABYSS_BOSSES is not defined when initializing abyss system!');
+        } else {
+            console.log(`Game: ABYSS_BOSSES loaded with ${ABYSS_BOSSES.length} bosses`);
+        }
+        if (typeof ABYSS_RELIC_POOLS === 'undefined') {
+            console.error('Game: ABYSS_RELIC_POOLS is not defined!');
+        } else {
+            const poolCount = Object.keys(ABYSS_RELIC_POOLS).length;
+            const totalRelics = Object.values(ABYSS_RELIC_POOLS).reduce((sum, pool) => sum + (pool?.length || 0), 0);
+            console.log(`Game: ABYSS_RELIC_POOLS loaded with ${poolCount} pools, ${totalRelics} relics`);
+        }
+        
+        this.abyssRelic = new AbyssRelic(this);
+        this.abyssDungeon = new AbyssDungeon(this);
+        this.isAbyssModalOpen = false;
+        this.isAbyssCodexModalOpen = false;
+        
         // Realm System (境界系统)
         this.realmIndex = 0;  // Current realm level
         this.maxDifficulty = 1; // Historical max difficulty
@@ -113,6 +133,13 @@ class Game {
         const realmBonus = this.getRealmBonus();
         stats.atk = stats.atk.mul(realmBonus);
         maxHp = maxHp.mul(realmBonus);
+        
+        // Apply abyss relic all-stat multiplier
+        if (this.abyssRelic) {
+            const relicBonuses = this.abyssRelic.getEffectiveBonuses();
+            stats.atk = stats.atk.mul(relicBonuses.allStatMultiplier);
+            maxHp = maxHp.mul(relicBonuses.allStatMultiplier);
+        }
 
         return { ...stats, maxHp };
     }
@@ -252,7 +279,7 @@ class Game {
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','dungeon','realm','garden'].indexOf(tab);
+        const btnIdx = ['law','dungeon','realm','garden','abyss'].indexOf(tab);
         document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
         
@@ -268,14 +295,21 @@ class Game {
         if (tab === 'garden') {
             this.updateGardenOverview();
         }
+        
+        // Update abyss overview when switching to abyss tab
+        if (tab === 'abyss') {
+            this.updateAbyssOverview();
+        }
     }
 
     toggleTowerMode() { this.changeMode('tower'); }
     toggleDungeonMode() { this.changeMode('dungeon'); }
+    toggleAbyssMode() { this.changeMode('abyss'); }
     
     changeMode(newMode) {
         if (this.isDead) return;
         if (this.mode === 'dungeon') this.dungeon.stop();
+        if (this.mode === 'abyss') this.abyssDungeon.stop();
         this.enemies = [];
         
         if (this.mode === newMode) {
@@ -296,9 +330,13 @@ class Game {
                 this.log('SYS', `进入血色副本T${this.dungeon.tier}！伤害已被压缩。`);
                 this.dungeon.start();
             }
+            if (newMode === 'abyss') {
+                this.log('SYS', '🌑 进入深渊战场！');
+                this.abyssDungeon.start();
+            }
         }
         this.updateButtons();
-        if (this.mode !== 'dungeon') this.spawnWildWave();
+        if (this.mode !== 'dungeon' && this.mode !== 'abyss') this.spawnWildWave();
     }
 
     updateButtons() {
@@ -307,24 +345,37 @@ class Game {
         const btnBoss = document.getElementById('btn-challenge');
         const stage = document.getElementById('stage-name');
 
+        // 设置按钮文本
         btnTower.innerText = this.mode === 'tower' ? "🏃 离开通天塔" : "🗼 挑战通天塔";
         btnDungeon.innerText = this.mode === 'dungeon' ? "🏃 离开副本" : "🔥 进入副本";
         btnTower.classList.toggle('active', this.mode === 'tower');
         btnDungeon.classList.toggle('active', this.mode === 'dungeon');
         
-        // 1. Set default text based on mode
-        if (this.mode === 'wild') {
+        // 深渊模式特殊处理
+        if (this.mode === 'abyss') {
+            const abyssBoss = this.enemies.find(e => e.isAbyssBoss);
+            btnBoss.style.display = 'block';
+            btnBoss.innerText = "🏃 离开深渊战场";
+            btnBoss.onclick = () => this.changeMode('wild');
+            stage.innerText = abyssBoss ? `🌑 深渊战场 - ${abyssBoss.name}` : '🌑 深渊战场';
+            stage.style.color = '#8b5cf6';
+        } else if (this.mode === 'wild') {
             btnBoss.style.display = 'block';
             btnBoss.innerText = "💀 召唤荒野BOSS (右键自动)";
+            btnBoss.onclick = () => this.manualSummonBoss();
             stage.innerText = `荒野 - 第 ${this.difficulty} 层`;
+            stage.style.color = '';
         } else if (this.mode === 'tower') {
             btnBoss.style.display = 'block';
             btnBoss.innerText = "👺 召唤塔主 (右键自动)";
+            btnBoss.onclick = () => this.manualSummonBoss();
             stage.innerText = `通天塔 - 第 ${this.towerLevel} 层`;
+            stage.style.color = '';
         } else {
             btnBoss.style.display = 'none';
             const tierInfo = this.dungeon.isUnlocked(this.dungeon.tier) ? `T${this.dungeon.tier}` : `🔒T${this.dungeon.tier}`;
             stage.innerText = `副本${tierInfo} - 难度 ${this.dungeon.level}`;
+            stage.style.color = '';
         }
 
         // 2. Override text if auto is active
@@ -365,6 +416,11 @@ class Game {
             }
         }
         
+        // Update abyss dungeon (boss revive timers)
+        if (this.abyssDungeon) {
+            this.abyssDungeon.update();
+        }
+        
         requestAnimationFrame(() => this.loop());
     }
 
@@ -372,7 +428,8 @@ class Game {
         if (this.isDead) return;
         this.enemies = this.enemies.filter(e => e.currentHp.gt(0));
         
-        if (this.mode !== 'dungeon' && this.enemies.filter(e => !e.isBoss).length < 10) {
+        // 深渊模式下不生成野生怪物
+        if (this.mode !== 'dungeon' && this.mode !== 'abyss' && this.enemies.filter(e => !e.isBoss).length < 10) {
             this.spawnWildWave();
         }
         if (this.mode === 'dungeon') this.dungeon.checkWaveClear();
@@ -386,7 +443,8 @@ class Game {
         
         // Damage (Player -> Enemy)
         let atk = pStats.atk;
-        if (this.mode === 'dungeon') {
+        if (this.mode === 'dungeon' || this.mode === 'abyss') {
+            // 数值压缩：用于副本和深渊
             let logVal = atk.log10();
             if(logVal < 0) logVal = 0;
             atk = new BigNum(Math.pow(logVal, 2));
@@ -401,12 +459,16 @@ class Game {
         }
 
         // Damage (Enemy -> Player)
+        // 过滤掉已死亡的敌人（刚被玩家击杀的）
+        this.enemies = this.enemies.filter(e => e.currentHp.gt(0));
+        
         let totalDmg = new BigNum(0);
         this.enemies.forEach(e => {
             totalDmg = totalDmg.add(e.atk);
         });
 
-        if (this.mode === 'dungeon') {
+        if (this.mode === 'dungeon' || this.mode === 'abyss') {
+            // 数值压缩：用于副本和深渊
             let logHp = pStats.maxHp.log10();
             if(logHp < 0) logHp = 0;
             const ehpVal = Math.pow(logHp, 2) * 5;
@@ -444,6 +506,13 @@ class Game {
         // Check if it's a realm boss
         if (enemy.isRealmBoss) {
             this.handleRealmBossKill();
+            return;
+        }
+        
+        // Check if it's an abyss boss
+        if (enemy.isAbyssBoss) {
+            this.abyssDungeon.handleAbyssBossDeath(enemy);
+            // 深渊BOSS死亡后不生成野生波次
             return;
         }
         
@@ -491,7 +560,7 @@ class Game {
         if (this.isDead) return;
         this.isDead = true;
         this.currentHp = new BigNum(0);
-        let reviveTime = (this.mode === 'dungeon') ? 15000 : 2000;
+        let reviveTime = (this.mode === 'dungeon' || this.mode === 'abyss') ? 15000 : 2000;
         
         let remaining = reviveTime / 1000;
         const reviveOverlay = document.getElementById('resurrect-overlay');
@@ -513,6 +582,12 @@ class Game {
             });
         }
         
+        if(this.mode === 'abyss') {
+            // 深渊死亡：BOSS进入复活，返回荒野
+            this.abyssDungeon.stop();
+            this.log('SYS', '💀 在深渊战场战败，BOSS进入复活...');
+        }
+        
         if(this.mode === 'wild' && this.enemies.some(e=>e.isBoss)) {
             this.enemies = this.enemies.filter(e=>!e.isBoss);
             this.lastBossDeathTime = Date.now();
@@ -529,6 +604,9 @@ class Game {
         
         if (this.mode === 'dungeon') {
             this.dungeon.start(); 
+        } else if (this.mode === 'abyss') {
+            // 深渊复活后返回荒野
+            this.changeMode('wild');
         } else {
             this.spawnWildWave();
         }
@@ -555,8 +633,13 @@ class Game {
         this.treasureChests -= count;
         
         const num = Math.floor(Math.random() * 2) + 3; // 3-4
+        // 应用遗宝秘宝等级加成
+        let treasureLevelBoost = 0;
+        if (this.abyssRelic) {
+            treasureLevelBoost = this.abyssRelic.getEffectiveBonuses().treasureLevelBoost;
+        }
         for(let i=0; i<num; i++) {
-            const t = new Treasure(this.difficulty + 1);
+            const t = new Treasure(this.difficulty + 1 + treasureLevelBoost);
             this.treasureBag.push(t);
             this.log('GAIN', `获得秘宝: <span style="color:${TREASURE_QUALITIES[t.qKey].color}">${t.name}</span>`);
         }
@@ -572,7 +655,12 @@ class Game {
     exchangeTreasure() {
         if (this.treasureFragments.gte(100)) {
             this.treasureFragments = this.treasureFragments.sub(100);
-            const t = new Treasure(this.difficulty + 1);
+            // 应用遗宝秘宝等级加成
+            let treasureLevelBoost = 0;
+            if (this.abyssRelic) {
+                treasureLevelBoost = this.abyssRelic.getEffectiveBonuses().treasureLevelBoost;
+            }
+            const t = new Treasure(this.difficulty + 1 + treasureLevelBoost);
             this.treasureBag.push(t);
             this.log('GAIN', `兑换成功: ${t.name}`);
             this.updateSystemUI();
@@ -848,12 +936,65 @@ class Game {
                 this.gardenStoneMultiplier = val.toNumber();
                 this.log('SYS', `金手指: 灵植灵石倍率设为 ${this.gardenStoneMultiplier}x`);
                 break;
+            case 'abyssFrag':
+                this.abyssRelic.fragments += val.toNumber();
+                this.log('SYS', `金手指: 深渊遗宝碎片 +${val.toNumber()}`);
+                this.updateAbyssOverview();
+                break;
+            case 'currentDiff':
+                // 增加当前难度并解锁相应系统
+                const oldDiff = this.difficulty;
+                this.difficulty += val.toNumber();
+                this.maxDifficulty = Math.max(this.maxDifficulty, this.difficulty);
+                this.log('SYS', `金手指: 当前难度 ${oldDiff} → ${this.difficulty}`);
+                // 检查解锁新系统
+                this.checkUnlocks();
+                this.updateRealmUI();
+                this.dungeon.updateUI();
+                break;
         }
         
         this.updateStatsUI();
         this.updateSystemUI();
         this.updateTreasureUI();
         this.closeModal('cheat-modal');
+    }
+    
+    // 检查系统解锁状态
+    checkUnlocks() {
+        // 检查境界突破解锁
+        const nextRealm = getRealmInfo(this.realmIndex);
+        if (nextRealm && this.difficulty >= nextRealm.requiredDifficulty) {
+            this.log('SYS', `✨ 境界突破已解锁！当前可突破至：${nextRealm.name}`);
+        }
+        
+        // 检查副本层数解锁
+        const maxTier = this.dungeon.getMaxUnlockedTier();
+        for (let tier = 1; tier <= 5; tier++) {
+            const required = getDungeonUnlockRequirement(tier);
+            if (this.difficulty >= required && tier > maxTier) {
+                this.log('SYS', `🔥 副本T${tier}已解锁！`);
+            }
+        }
+        
+        // 检查深渊BOSS解锁
+        if (typeof ABYSS_BOSSES !== 'undefined') {
+            ABYSS_BOSSES.forEach(boss => {
+                if (this.difficulty >= boss.unlockDifficulty) {
+                    this.log('SYS', `🌑 ${boss.name}已解锁！`);
+                }
+            });
+        }
+        
+        // 检查灵植园功能解锁
+        if (this.garden) {
+            if (this.garden.gardenLevel >= 2) {
+                this.log('SYS', `🤖 傀儡托管已解锁！`);
+            }
+            if (this.garden.gardenLevel >= 10) {
+                this.log('SYS', `🔥 丹火提炼已解锁！`);
+            }
+        }
     }
 
     // --- Other Logic ---
@@ -916,9 +1057,15 @@ class Game {
 
     rollWildLoot(isBoss) {
         let pillMult = new BigNum(1);
+        // 秘宝丹药倍率
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
             if(t && t.attrType.type === 'pill_mult') pillMult = pillMult.mul(t.val); 
+        }
+        // 深渊遗宝刷丹倍率
+        if (this.abyssRelic) {
+            const relicBonuses = this.abyssRelic.getEffectiveBonuses();
+            pillMult = pillMult.mul(relicBonuses.pillEffectMultiplier);
         }
         const pill = new Item(this.difficulty, 'pill');
         pill.hpValue = pill.hpValue.mul(pillMult); 
@@ -926,7 +1073,12 @@ class Game {
         this.autoConsumePill(pill);
 
         if (Math.random() < (isBoss ? 1 : 0.5)) {
-            this.checkAutoEquip(new Item(this.difficulty));
+            // 应用遗宝装备等级加成
+            let equipLevelBoost = 0;
+            if (this.abyssRelic) {
+                equipLevelBoost = this.abyssRelic.getEffectiveBonuses().equipLevelBoost;
+            }
+            this.checkAutoEquip(new Item(this.difficulty + equipLevelBoost));
         }
     }
 
@@ -934,12 +1086,19 @@ class Game {
         let drop = new BigNum(SCALE_TOWER_DROP).pow(this.towerLevel).mul(1 + this.cultRound);
         if(isBoss) drop = drop.mul(10);
         
+        // 秘宝爬塔掉率
         let tMult = new BigNum(1);
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
             if(t && t.attrType.type === 'tower_drop') tMult = tMult.mul(t.val);
         }
         drop = drop.mul(tMult);
+        
+        // 深渊遗宝爬塔掉率
+        if (this.abyssRelic) {
+            const relicBonuses = this.abyssRelic.getEffectiveBonuses();
+            drop = drop.mul(relicBonuses.towerDropMultiplier);
+        }
         
         this.lawFragments = this.lawFragments.add(drop);
         this.log('GAIN', `获得真意: ${formatNum(drop)}`);
@@ -1032,38 +1191,28 @@ class Game {
         
         if(document.getElementById('dungeon-timer')) document.getElementById('dungeon-timer').innerText = this.dungeon.timeRemaining > 0 ? `${this.dungeon.timeRemaining}s` : "--";
         
-        // 更新层数按钮状态和解锁提示
-        for (let t = 1; t <= MAX_DUNGEON_TIER; t++) {
-            const btn = document.getElementById(`dungeon-tier-${t}`);
-            if (btn) {
-                const unlocked = this.dungeon.isUnlocked(t);
-                const required = getDungeonUnlockRequirement(t);
-                btn.disabled = !unlocked;
-                if (unlocked) {
-                    btn.style.background = this.dungeon.tier === t ? '#e65100' : '#555';
-                    btn.style.color = 'white';
-                    btn.style.cursor = 'pointer';
-                    btn.innerText = `T${t}`;
-                } else {
-                    btn.style.background = '#222';
-                    btn.style.color = '#555';
-                    btn.style.cursor = 'not-allowed';
-                    btn.innerText = `T${t}🔒`;
-                }
-            }
+        // 更新层数输入框和推荐层数
+        const tierInput = document.getElementById('dungeon-tier-input');
+        if (tierInput) tierInput.value = this.dungeon.tier;
+        
+        // 更新推荐层数显示
+        const recommendEl = document.getElementById('dungeon-recommend-tier');
+        if (recommendEl) {
+            const recommended = this.dungeon.calculateRecommendedTier();
+            recommendEl.innerText = `💡 推荐层数: T${recommended}`;
         }
         
         // 更新解锁提示
         const hintEl = document.getElementById('dungeon-unlock-hint');
-        if (hintEl) {
-            const maxUnlocked = this.dungeon.getMaxUnlockedTier();
-            const nextUnlock = this.dungeon.getNextUnlockRequirement();
-            if (nextUnlock) {
-                const nextTier = maxUnlocked + 1;
-                const progress = Math.min(100, Math.floor((this.difficulty / nextUnlock) * 100));
-                hintEl.innerHTML = `T${nextTier}解锁进度: N${this.difficulty}/${nextUnlock} (${progress}%)`;
+        const inputEl = document.getElementById('dungeon-tier-input');
+        if (hintEl && inputEl) {
+            const inputTier = parseInt(inputEl.value) || 1;
+            if (!this.dungeon.isUnlocked(inputTier)) {
+                hintEl.innerHTML = `🔒 T${inputTier}需主线N${getDungeonUnlockRequirement(inputTier)}解锁`;
+                inputEl.style.borderColor = '#f87171';
             } else {
-                hintEl.innerHTML = `✅ 已解锁全部层数！`;
+                hintEl.innerHTML = '';
+                inputEl.style.borderColor = this.dungeon.tier === inputTier ? '#4ade80' : '#444';
             }
         }
         
@@ -1097,6 +1246,102 @@ class Game {
         document.getElementById('mul-drop').innerText = "+" + (this.cultRound * 100) + '%';
     }
 
+    /**
+     * 打开属性详情面板
+     */
+    openStatsDetailModal() {
+        this.updateStatsDetailModal();
+        document.getElementById('stats-detail-modal').style.display = 'flex';
+    }
+    
+    /**
+     * 更新属性详情面板内容
+     */
+    updateStatsDetailModal() {
+        const s = this.getTotalStats();
+        const currentRealm = this.getCurrentRealm();
+        const realmBonus = this.getRealmBonus();
+        
+        // 基础属性
+        document.getElementById('detail-base-hp').innerText = formatNum(this.playerBase.hp);
+        document.getElementById('detail-base-atk').innerText = formatNum(this.playerBase.atk);
+        document.getElementById('detail-base-crit').innerText = this.playerBase.crit + '%';
+        
+        // 最终属性
+        document.getElementById('detail-final-hp').innerText = formatNum(s.maxHp);
+        document.getElementById('detail-final-atk').innerText = formatNum(s.atk);
+        document.getElementById('detail-final-crit').innerText = s.crit + '%';
+        
+        // 境界加成
+        document.getElementById('detail-realm-name').innerText = currentRealm.name;
+        document.getElementById('detail-realm-bonus').innerText = 'x' + formatNum(realmBonus);
+        
+        // 计算装备总加成
+        let equipAtk = new BigNum(0);
+        let equipHp = new BigNum(0);
+        let equipCrit = 0;
+        for (let key in this.equipment) {
+            const item = this.equipment[key];
+            if (item) {
+                equipAtk = equipAtk.add(item.atk);
+                equipHp = equipHp.add(item.hp);
+                equipCrit += item.crit || 0;
+            }
+        }
+        document.getElementById('detail-equip-atk').innerText = '+' + formatNum(equipAtk);
+        document.getElementById('detail-equip-hp').innerText = '+' + formatNum(equipHp);
+        document.getElementById('detail-equip-crit').innerText = '+' + equipCrit + '%';
+        
+        // 法则加成
+        document.getElementById('detail-law-atk').innerText = 'x' + formatNum(this.lawMultipliers.atk);
+        document.getElementById('detail-law-hp').innerText = 'x' + formatNum(this.lawMultipliers.hp);
+        document.getElementById('detail-law-round').innerText = this.cultRound + '轮';
+        
+        // 秘宝加成
+        let treasureMult = new BigNum(1);
+        let treasurePillMult = new BigNum(1);
+        let treasureTowerMult = new BigNum(1);
+        const equippedTreasureList = [];
+        for (let key in this.equippedTreasures) {
+            const t = this.equippedTreasures[key];
+            if (t) {
+                if (t.attrType.type === 'all_stat') {
+                    treasureMult = treasureMult.mul(t.val);
+                    if (t.hasExtra) treasureMult = treasureMult.mul(t.extraVal);
+                } else if (t.attrType.type === 'pill_mult') {
+                    treasurePillMult = treasurePillMult.mul(t.val);
+                    if (t.hasExtra) treasurePillMult = treasurePillMult.mul(t.extraVal);
+                } else if (t.attrType.type === 'tower_drop') {
+                    treasureTowerMult = treasureTowerMult.mul(t.val);
+                    if (t.hasExtra) treasureTowerMult = treasureTowerMult.mul(t.extraVal);
+                }
+                equippedTreasureList.push(`${TREASURE_SLOTS.find(s => s.key === key)?.name || key}: ${t.attrType.short}×${formatNum(t.val)}`);
+            }
+        }
+        document.getElementById('detail-treasure-mult').innerText = 'x' + formatNum(treasureMult);
+        document.getElementById('detail-treasure-pill').innerText = 'x' + formatNum(treasurePillMult);
+        document.getElementById('detail-treasure-tower').innerText = 'x' + formatNum(treasureTowerMult);
+        document.getElementById('detail-treasure-list').innerText = equippedTreasureList.length > 0 
+            ? equippedTreasureList.join(' | ') 
+            : '未装备秘宝';
+        
+        // 遗宝加成
+        if (this.abyssRelic) {
+            const relicBonuses = this.abyssRelic.getEffectiveBonuses();
+            document.getElementById('detail-relic-stat').innerText = 'x' + formatNum(relicBonuses.allStatMultiplier);
+            document.getElementById('detail-relic-tower').innerText = 'x' + formatNum(relicBonuses.towerDropMultiplier);
+            document.getElementById('detail-relic-pill').innerText = 'x' + formatNum(relicBonuses.pillEffectMultiplier);
+            document.getElementById('detail-relic-equip').innerText = '+' + relicBonuses.equipLevelBoost;
+            document.getElementById('detail-relic-treasure').innerText = '+' + relicBonuses.treasureLevelBoost;
+        } else {
+            document.getElementById('detail-relic-stat').innerText = 'x1';
+            document.getElementById('detail-relic-tower').innerText = 'x1';
+            document.getElementById('detail-relic-pill').innerText = 'x1';
+            document.getElementById('detail-relic-equip').innerText = '+0';
+            document.getElementById('detail-relic-treasure').innerText = '+0';
+        }
+    }
+
     updateCombatUI(force) {
         const s = this.getTotalStats();
         // Calculate percentage for HP bar
@@ -1114,10 +1359,12 @@ class Game {
             c.innerHTML = '';
             this.enemies.forEach(e => {
                 const el = document.createElement('div');
-                // Add special class for realm boss
+                // Add special class for realm boss or abyss boss
                 let className = 'entity';
                 if (e.isRealmBoss) {
                     className += ' realm-boss-entity';
+                } else if (e.isAbyssBoss) {
+                    className += ' abyss-boss-entity';
                 } else if (e.isBoss) {
                     className += ' boss-entity';
                 } else {
@@ -1593,6 +1840,124 @@ class Game {
     selectGardenTool(tool) {
         if (this.garden) this.garden.selectTool(tool);
         this.updateGardenUI();
+    }
+    
+    // ==================== Abyss Relic System (深渊遗宝系统) ====================
+    
+    updateAbyssOverview() {
+        if (!this.abyssRelic) return;
+        
+        // 更新收集进度
+        const progress = this.abyssRelic.getTotalProgress();
+        const progressEl = document.getElementById('abyss-overview-progress');
+        if (progressEl) {
+            progressEl.innerText = `${progress.collected}/${progress.total} (${progress.percentage}%)`;
+        }
+        
+        // 更新碎片数量
+        const fragmentsEl = document.getElementById('abyss-overview-fragments');
+        if (fragmentsEl) {
+            fragmentsEl.innerText = this.abyssRelic.fragments;
+        }
+        
+        // 更新属性加成预览
+        const bonusPreview = document.getElementById('abyss-bonus-preview');
+        if (bonusPreview) {
+            const bonuses = this.abyssRelic.activeBonuses;
+            const effBonuses = this.abyssRelic.getEffectiveBonuses();
+            const bonusTexts = [];
+            
+            // 显示碎片数量
+            bonusTexts.push(`🧩 遗宝碎片: ${this.abyssRelic.fragments}`);
+            
+            // 1. 全属性倍率（指数级乘数）
+            if (bonuses.allStatMult > 1) {
+                bonusTexts.push(`全属性倍率 ×${effBonuses.allStatMultiplier.toFixed(2)}`);
+            }
+            
+            // 2. 爬塔掉率（指数级乘数）
+            if (bonuses.towerDropRate > 1) {
+                bonusTexts.push(`爬塔掉率 ×${effBonuses.towerDropMultiplier.toFixed(2)}`);
+            }
+            
+            // 3. 刷丹倍率（指数级乘数）
+            if (bonuses.pillEffectMult > 1) {
+                bonusTexts.push(`刷丹倍率 ×${effBonuses.pillEffectMultiplier.toFixed(2)}`);
+            }
+            
+            // 4. 装备等级
+            if (effBonuses.equipLevelBoost > 0) {
+                bonusTexts.push(`装备等级 +${effBonuses.equipLevelBoost}`);
+            }
+            
+            // 5. 秘宝等级
+            if (effBonuses.treasureLevelBoost > 0) {
+                bonusTexts.push(`秘宝等级 +${effBonuses.treasureLevelBoost}`);
+            }
+            
+            bonusPreview.innerHTML = bonusTexts.map(t => `<div style="color:#a78bfa;">${t}</div>`).join('');
+        }
+    }
+    
+    // Open/Close Abyss Modal
+    openAbyssModal() {
+        console.log('openAbyssModal called');
+        console.log('ABYSS_BOSSES available:', typeof ABYSS_BOSSES !== 'undefined', ABYSS_BOSSES?.length);
+        
+        this.isAbyssModalOpen = true;
+        const modal = document.getElementById('abyss-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            this.abyssDungeon.renderAbyssMain();
+            this.updateAbyssUI();
+        } else {
+            console.error('abyss-modal not found');
+        }
+    }
+    
+    closeAbyssModal() {
+        this.isAbyssModalOpen = false;
+        document.getElementById('abyss-modal').style.display = 'none';
+    }
+    
+    updateAbyssUI() {
+        if (!this.isAbyssModalOpen) return;
+        
+        // 更新深渊战场UI（战斗或BOSS列表）
+        this.abyssDungeon.renderAbyssMain();
+        
+        // 更新总体收集进度
+        const progress = this.abyssRelic.getTotalProgress();
+        const progressEl = document.getElementById('abyss-total-progress');
+        if (progressEl) {
+            progressEl.innerText = `📚 遗宝收集：${progress.collected}/${progress.total} (${progress.percentage}%)`;
+        }
+    }
+    
+    // Open/Close Abyss Codex
+    openAbyssCodex() {
+        console.log('openAbyssCodex called');
+        console.log('ABYSS_BOSSES available:', typeof ABYSS_BOSSES !== 'undefined', ABYSS_BOSSES?.length);
+        console.log('ABYSS_RELIC_POOLS available:', typeof ABYSS_RELIC_POOLS !== 'undefined', Object.keys(ABYSS_RELIC_POOLS || {}).length);
+        
+        this.isAbyssCodexModalOpen = true;
+        const modal = document.getElementById('abyss-codex-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            this.abyssDungeon.showRelicCollection();
+        } else {
+            console.error('abyss-codex-modal not found');
+        }
+    }
+    
+    closeAbyssCodex() {
+        this.isAbyssCodexModalOpen = false;
+        document.getElementById('abyss-codex-modal').style.display = 'none';
+    }
+    
+    updateAbyssCodexUI() {
+        if (!this.isAbyssCodexModalOpen) return;
+        // UI is updated by showRelicCollection
     }
 }
 
