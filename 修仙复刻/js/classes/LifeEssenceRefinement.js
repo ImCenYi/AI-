@@ -36,6 +36,9 @@ class LifeEssenceRefinement {
         // 总加成倍数
         this.totalMultiplier = new BigNum(1);
         
+        // 境界突破历史记录（记录每次突破时的轮数）
+        this.realmBreakthroughRounds = [0]; // 初始在0轮
+        
         // 淬炼历史记录
         this.refinementHistory = [];
         
@@ -108,22 +111,24 @@ class LifeEssenceRefinement {
     
     /**
      * 获取当前节点的加成预览
-     * 前9次：乘算 ×1.1
-     * 第10次：指数 +0.1%
+     * 前9次：无直接加成，只解锁下一节点
+     * 第10次：境界突破，根据轮数间隔计算 1.2^间隔 倍全属性
      */
     getNodeBonusPreview() {
         const isLastNode = this.refinementStep === 9;
         if (isLastNode) {
+            const preview = this.getNextBreakthroughPreview();
             return {
-                type: 'rare',
+                type: 'breakthrough',
                 expBonus: 0.001,  // 第10次：+0.1%指数
-                description: '任督贯通，肉身蜕变！'
+                breakthroughMultiplier: preview.multiplier,
+                roundInterval: preview.roundInterval,
+                description: `境界突破！${preview.displayText} 全属性加成`
             };
         } else {
             return {
                 type: 'normal',
-                multiplier: 1.1,  // 前9次：×1.1
-                description: '锻体强身，气力增长'
+                description: '淬炼经脉，为突破做准备'
             };
         }
     }
@@ -161,11 +166,12 @@ class LifeEssenceRefinement {
         const oldExpBonus = this.getTotalExpBonus();
         
         // 应用对应的加成
-        if (bonus.type === 'normal') {
-            // 前9次：乘算加成
-            this.totalMultiplier = this.totalMultiplier.mul(bonus.multiplier);
-        }
-        // 第10次的指数加成在 getTotalExpBonus() 中通过 refinementRound 计算
+        // 注意：境界突破的乘算加成在 refineStep >= 10 时统一计算（1.2^轮数间隔）
+        // 普通节点淬炼不再提供乘算加成，只解锁下一节点
+        
+        // 检查是否是境界突破（完成第10个节点）
+        const isBreakthrough = this.refinementStep === 9;
+        let breakthroughInfo = null;
         
         // 标记节点为已淬炼
         currentNode.refined = true;
@@ -183,8 +189,29 @@ class LifeEssenceRefinement {
         // 推进进度
         this.refinementStep++;
         if (this.refinementStep >= 10) {
+            // 完成一轮，境界突破！
             this.refinementStep = 0;
             this.refinementRound++;
+            
+            // 记录突破轮数
+            this.realmBreakthroughRounds.push(this.refinementRound);
+            
+            // 计算境界突破加成：1.2^轮数间隔
+            const prevBreakthroughRound = this.realmBreakthroughRounds[this.realmBreakthroughRounds.length - 2] || 0;
+            const roundInterval = this.refinementRound - prevBreakthroughRound;
+            const breakthroughMultiplier = Math.pow(1.2, roundInterval);
+            
+            // 应用突破加成（乘算）
+            this.totalMultiplier = this.totalMultiplier.mul(breakthroughMultiplier);
+            
+            // 记录突破信息
+            breakthroughInfo = {
+                isBreakthrough: true,
+                roundInterval: roundInterval,
+                multiplier: breakthroughMultiplier,
+                displayText: `1.2^${roundInterval} = ×${breakthroughMultiplier.toFixed(2)}`
+            };
+            
             // 重置节点状态，但保持解锁
             this.meridianNodes.forEach((node, idx) => {
                 node.refined = false;
@@ -208,6 +235,7 @@ class LifeEssenceRefinement {
             success: true,
             node: currentNode,
             bonus: bonus,
+            breakthrough: breakthroughInfo,
             oldMultiplier: oldMultiplier,
             newMultiplier: newMultiplier,
             oldExpBonus: oldExpBonus,
@@ -219,17 +247,32 @@ class LifeEssenceRefinement {
     /**
      * 应用加成到游戏属性
      * 混合加成：
-     * - 乘算部分：前9次 ×1.1 累积到 totalMultiplier
+     * - 乘算部分：境界突破时根据轮数间隔计算 1.2^间隔，累积到 totalMultiplier
      * - 指数部分：每轮最后1次 +0.1% 指数加成
      */
     applyMultiplierToGame() {
-        // 存储乘算倍数
+        // 存储乘算倍数（包含境界突破加成）
         this.game.gardenMeridianMultiplier = this.totalMultiplier;
         // 存储指数加成百分比 (如 0.001 表示 +0.1%)
         this.game.gardenMeridianExpBonus = this.getTotalExpBonus();
         
         // 通知游戏更新属性
         this.game.updateStatsUI();
+    }
+    
+    /**
+     * 获取下一次境界突破的加成预览
+     */
+    getNextBreakthroughPreview() {
+        const nextRound = this.refinementRound + 1;
+        const prevBreakthroughRound = this.realmBreakthroughRounds[this.realmBreakthroughRounds.length - 1] || 0;
+        const roundInterval = nextRound - prevBreakthroughRound;
+        const breakthroughMultiplier = Math.pow(1.2, roundInterval);
+        return {
+            roundInterval: roundInterval,
+            multiplier: breakthroughMultiplier,
+            displayText: `1.2^${roundInterval} = ×${breakthroughMultiplier.toFixed(2)}`
+        };
     }
     
     /**
@@ -247,22 +290,23 @@ class LifeEssenceRefinement {
         const currentMult = this.totalMultiplier;
         const currentExpBonus = this.getTotalExpBonus();
         
-        if (bonus.type === 'rare') {
-            // 最后一级：指数加成
+        if (bonus.type === 'breakthrough') {
+            // 境界突破：根据轮数间隔计算加成
+            const nextMult = currentMult.mul(bonus.breakthroughMultiplier);
             return {
-                type: 'exp',
-                current: `指数+${(currentExpBonus * 100).toFixed(1)}%`,
-                next: `指数+${((currentExpBonus + 0.001) * 100).toFixed(1)}%`,
-                gain: '+0.1% 指数'
-            };
-        } else {
-            // 普通等级：乘算加成
-            const nextMult = currentMult.mul(1.1);
-            return {
-                type: 'mult',
+                type: 'breakthrough',
                 current: `×${formatNum(currentMult)}`,
                 next: `×${formatNum(nextMult)}`,
-                gain: '×1.1 全属性'
+                gain: `1.2^${bonus.roundInterval} = ×${bonus.breakthroughMultiplier.toFixed(2)}`,
+                expGain: '+0.1% 指数'
+            };
+        } else {
+            // 普通等级：无直接属性加成，只解锁下一节点
+            return {
+                type: 'normal',
+                current: `×${formatNum(currentMult)}`,
+                next: `×${formatNum(currentMult)}`,
+                gain: '解锁下一节点'
             };
         }
     }
@@ -470,13 +514,14 @@ class LifeEssenceRefinement {
         if (result.success) {
             const newRealm = this.getCurrentRealm();
             
-            if (newRealm.round > oldRealm.round) {
-                this.game.log('SKILL', `⚔️ 境界突破！${oldRealm.name} → ${newRealm.name}！`);
-                this.game.log('SKILL', `💪 ${newRealm.desc}！肉身蜕变！`);
-            } else if (result.bonus.type === 'rare') {
-                this.game.log('SKILL', `⭐ 打通${result.node.name}！肉身升华！`);
+            if (result.breakthrough) {
+                // 境界突破
+                const bt = result.breakthrough;
+                this.game.log('SKILL', `⚔️ 境界突破！${oldRealm.displayName} → ${newRealm.displayName}！`);
+                this.game.log('SKILL', `💪 轮数间隔${bt.roundInterval}，肉身蜕变${bt.displayText}！`);
             } else {
-                this.game.log('GAIN', `🔥 淬炼${result.node.name}！气力暴增×${result.bonus.multiplier}`);
+                // 普通节点淬炼
+                this.game.log('GAIN', `🔥 淬炼${result.node.name}！经脉更加坚韧`);
             }
         } else {
             this.game.log('SYS', result.message);
@@ -495,11 +540,20 @@ class LifeEssenceRefinement {
      */
     refineAll() {
         let count = 0;
+        let breakthroughCount = 0;
+        let totalMultiplierGain = 1;
         let startRealm = this.getCurrentRealm();
+        
         while (true) {
+            const oldRealm = this.getCurrentRealm();
             const result = this.refine();
             if (!result.success) break;
             count++;
+            
+            if (result.breakthrough) {
+                breakthroughCount++;
+                totalMultiplierGain *= result.breakthrough.multiplier;
+            }
             
             if (count >= 100) break;
         }
@@ -507,9 +561,10 @@ class LifeEssenceRefinement {
         if (count > 0) {
             let endRealm = this.getCurrentRealm();
             if (endRealm.round > startRealm.round) {
-                this.game.log('SKILL', `⚔️ 连续锻体！${startRealm.name} → ${endRealm.name}！`);
+                const multText = breakthroughCount > 1 ? `，累计×${totalMultiplierGain.toFixed(2)}` : '';
+                this.game.log('SKILL', `⚔️ 连续突破！${startRealm.displayName} → ${endRealm.displayName}${multText}！`);
             } else {
-                this.game.log('SYS', `🔥 连续淬体${count}次，体魄更胜从前`);
+                this.game.log('SYS', `🔥 连续淬体${count}次，经脉更加坚韧`);
             }
             if (this.game.isGardenModalOpen) {
                 this.game.updateGardenUI();

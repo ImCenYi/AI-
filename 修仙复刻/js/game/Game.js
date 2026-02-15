@@ -65,6 +65,13 @@ class Game {
         this.gardenStoneMultiplier = 1;
         this.gardenEssenceMultiplier = 1;
         
+        // Ancient Treasure System (大千宝录古宝系统)
+        this.ancientTreasure = new AncientTreasure(this);
+        this.ancientTreasureMultiplier = new BigNum(1);
+        this.ancientTreasureBonuses = {};
+        this.treasureDrawTokens = 0; // 寻宝令
+        this.isTreasureModalOpen = false;
+        
         this.isDead = false;
         this.lastTick = Date.now();
         this.autoChallenge = false;
@@ -154,6 +161,15 @@ class Game {
             if (expBonus > 0) {
                 stats.atk = stats.atk.expBonus(expBonus);
                 maxHp = maxHp.expBonus(expBonus);
+            }
+        }
+        
+        // Apply Ancient Treasure bonus (大千宝录古宝加成)
+        if (this.ancientTreasure) {
+            const treasurePower = this.ancientTreasure.getTotalPowerMultiplier();
+            if (treasurePower.gt(1)) {
+                stats.atk = stats.atk.mul(treasurePower);
+                maxHp = maxHp.mul(treasurePower);
             }
         }
 
@@ -295,7 +311,7 @@ class Game {
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','dungeon','realm','garden','abyss'].indexOf(tab);
+        const btnIdx = ['law','dungeon','realm','garden','ancient-treasure','abyss'].indexOf(tab);
         document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
         
@@ -315,6 +331,11 @@ class Game {
         // Update abyss overview when switching to abyss tab
         if (tab === 'abyss') {
             this.updateAbyssOverview();
+        }
+
+        // Update ancient treasure overview when switching to ancient-treasure tab
+        if (tab === 'ancient-treasure') {
+            this.updateTreasureUI();
         }
     }
 
@@ -964,6 +985,11 @@ class Game {
                 }
                 this.log('SYS', `金手指: 每个BOSS深渊遗宝碎片 +${fragPerBoss}`);
                 this.updateAbyssOverview();
+                break;
+            case 'treasureToken':
+                // 添加古宝寻宝令
+                this.treasureDrawTokens += val.toNumber();
+                this.log('SYS', `金手指: 古宝寻宝令 +${formatNum(val)}`);
                 break;
             case 'currentDiff':
                 // 增加当前难度并解锁相应系统
@@ -1928,6 +1954,395 @@ class Game {
     closeGardenModal() {
         this.isGardenModalOpen = false;
         document.getElementById('garden-full-modal').style.display = 'none';
+    }
+    
+    // --- Ancient Treasure System (大千宝录古宝系统) ---
+    openAncientTreasureModal() {
+        this.isTreasureModalOpen = true;
+        document.getElementById('treasure-ancient-modal').style.display = 'flex';
+        this.updateTreasureUI();
+    }
+
+    closeAncientTreasureModal() {
+        this.isTreasureModalOpen = false;
+        document.getElementById('treasure-ancient-modal').style.display = 'none';
+    }
+    
+    closeTreasureDrawResult() {
+        if (this.ancientTreasure) {
+            this.ancientTreasure.showResult = false;
+            this.ancientTreasure.drawResults = [];
+        }
+        const modal = document.getElementById('treasure-draw-result-modal');
+        if (modal) modal.style.display = 'none';
+        this.updateTreasureUI();
+    }
+    
+    upgradeSelectedTreasure() {
+        if (this.ancientTreasure.selectedId) {
+            const result = this.ancientTreasure.upgrade(this.ancientTreasure.selectedId);
+            if (result) {
+                this.updateTreasureUI();
+            }
+        }
+    }
+    
+    updateTreasureUI() {
+        const at = this.ancientTreasure;
+
+        // 更新标签概览面板 (always update these)
+        const overviewTokensEl = document.getElementById('ancient-treasure-tokens');
+        if (overviewTokensEl) overviewTokensEl.innerText = this.treasureDrawTokens || 0;
+
+        const overviewProgressEl = document.getElementById('ancient-treasure-progress');
+        if (overviewProgressEl) {
+            const collected = at.getCollectedCount();
+            const total = at.getTotalCount();
+            const percent = total > 0 ? Math.floor((collected / total) * 100) : 0;
+            overviewProgressEl.innerText = `${collected}/${total} (${percent}%)`;
+        }
+
+        const overviewPowerEl = document.getElementById('ancient-treasure-total-power');
+        if (overviewPowerEl) {
+            overviewPowerEl.innerText = '×' + at.formatLog10(at.getTotalPowerLog());
+        }
+
+        // 更新里程碑信息
+        const milestoneEl = document.getElementById('ancient-treasure-milestone');
+        if (milestoneEl) {
+            const completed = at.getCompletedRealmCount();
+            const totalRealms = Object.keys(at.library).length;
+            const bonus = completed * at.milestoneBonus;
+            milestoneEl.innerHTML = `
+                <div style="color: #fbbf24; font-weight: bold;">🏆 已完成界域: ${completed}/${totalRealms}</div>
+                <div style="font-size: 0.75rem; color: #888;">里程碑加成: +${bonus.toFixed(1)}% (每完成一个界域+50%)</div>
+            `;
+        }
+
+        // 更新羁绊信息
+        const synergiesEl = document.getElementById('ancient-treasure-synergies');
+        if (synergiesEl) {
+            let synergyHtml = '';
+            at.synergies.forEach(synergy => {
+                const activeCount = at.getSynergyActiveCount(synergy.id);
+                const level = at.getSynergyLevel(synergy.id);
+                const maxLevel = synergy.levels.length;
+                const nextReq = level < maxLevel ? synergy.levels[level].require : synergy.levels[maxLevel - 1].require;
+
+                let progressColor = '#666';
+                if (level >= 3) progressColor = '#fbbf24'; // 满级金色
+                else if (level >= 2) progressColor = '#a78bfa'; // 2级紫色
+                else if (level >= 1) progressColor = '#60a5fa'; // 1级蓝色
+
+                synergyHtml += `
+                    <div style="
+                        padding: 6px 8px;
+                        background: rgba(255,255,255,0.03);
+                        border-radius: 4px;
+                        border-left: 3px solid ${progressColor};
+                    ">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <span style="color: ${progressColor}; font-weight: bold;">${synergy.icon} ${synergy.name}</span>
+                            <span style="font-size:0.7rem; color: #888;">Lv.${level}/${maxLevel}</span>
+                        </div>
+                        <div style="font-size:0.7rem; color: #aaa; margin-bottom:4px;">${synergy.desc}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.65rem;">
+                            <span style="color: #666;">进度: ${activeCount}/${nextReq}</span>
+                            <span style="color: ${level > 0 ? '#4ade80' : '#666'};">${level > 0 ? synergy.levels[level - 1].desc : '未激活'}</span>
+                        </div>
+                        ${level > 0 ? `
+                        <div style="margin-top:4px; font-size:0.6rem; color: #4ade80;">
+                            ${synergy.levels.slice(0, level).map(l => '✦ ' + l.desc).join('<br>')}
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            synergiesEl.innerHTML = synergyHtml;
+        }
+
+        // 更新各界域收集进度
+        const realmsProgressEl = document.getElementById('ancient-treasure-realms');
+        if (realmsProgressEl) {
+            let html = '<div style="margin-top: 10px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px;">';
+            Object.keys(at.library).forEach(realmName => {
+                const items = at.library[realmName];
+                const collected = items.filter(item => {
+                    const data = at.playerData[item.id];
+                    return data && data.level > 0;
+                }).length;
+                const total = items.length;
+                const isCompleted = at.isRealmCompleted(realmName);
+                const percent = Math.floor((collected / total) * 100);
+
+                html += `
+                    <div style="
+                        padding: 5px 8px;
+                        background: ${isCompleted ? 'rgba(251, 191, 36, 0.2)' : 'rgba(255,255,255,0.05)'};
+                        border: 1px solid ${isCompleted ? '#fbbf24' : '#444'};
+                        border-radius: 4px;
+                        font-size: 0.7rem;
+                        text-align: center;
+                    ">
+                        <div style="color: ${isCompleted ? '#fbbf24' : '#aaa'};">${realmName.slice(0, 2)}</div>
+                        <div style="color: #888;">${collected}/${total}</div>
+                        <div style="width: 100%; height: 3px; background: #333; border-radius: 2px; margin-top: 2px;">
+                            <div style="width: ${percent}%; height: 100%; background: ${isCompleted ? '#fbbf24' : '#3b82f6'}; border-radius: 2px;"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            realmsProgressEl.innerHTML = html;
+        }
+
+        // 如果modal未打开，只更新概览面板
+        if (!this.isTreasureModalOpen) return;
+
+        // 更新寻宝令显示 (modal内)
+        const tokensEl = document.getElementById('treasure-draw-tokens');
+        if (tokensEl) tokensEl.innerText = this.treasureDrawTokens || 0;
+        
+        // 更新总战力
+        const totalPowerEl = document.getElementById('treasure-total-power');
+        if (totalPowerEl) {
+            totalPowerEl.innerText = '×' + at.formatLog10(at.getTotalPowerLog());
+        }
+        
+        // 更新收集进度
+        const collectedEl = document.getElementById('treasure-collected-count');
+        const totalEl = document.getElementById('treasure-total-count');
+        const tabPowerEl = document.getElementById('treasure-tab-power');
+        if (collectedEl) collectedEl.innerText = at.getCollectedCount();
+        if (totalEl) totalEl.innerText = at.getTotalCount();
+        if (tabPowerEl) tabPowerEl.innerText = at.formatLog10(at.getTabPowerLog(at.activeTab));
+        
+        // 更新保底计数
+        const pityEl = document.getElementById('treasure-pity-count');
+        if (pityEl) pityEl.innerText = at.pityCount;
+        
+        // 更新标签页
+        this.updateTreasureTabs();
+        
+        // 更新古宝列表
+        this.updateTreasureList();
+        
+        // 更新详情面板
+        this.updateTreasureDetail();
+    }
+    
+    updateTreasureTabs() {
+        const container = document.getElementById('treasure-tabs');
+        if (!container) return;
+        
+        const at = this.ancientTreasure;
+        const tabs = Object.keys(at.library);
+        
+        let html = '';
+        tabs.forEach(tab => {
+            const isActive = at.activeTab === tab;
+            html += `
+                <button class="treasure-tab-btn ${isActive ? 'active' : ''}" onclick="game.switchTreasureTab('${tab}')">
+                    ${tab.slice(0, 2)}
+                </button>
+            `;
+        });
+        
+        container.innerHTML = html;
+    }
+    
+    switchTreasureTab(tabName) {
+        this.ancientTreasure.activeTab = tabName;
+        this.ancientTreasure.selectedId = null;
+        this.updateTreasureUI();
+    }
+    
+    updateTreasureList() {
+        const container = document.getElementById('treasure-list-content');
+        if (!container) {
+            console.warn('[updateTreasureList] Container not found');
+            return;
+        }
+
+        const at = this.ancientTreasure;
+        if (!at || !at.library) {
+            console.warn('[updateTreasureList] AncientTreasure not initialized');
+            return;
+        }
+
+        console.log('[updateTreasureList] Active tab:', at.activeTab, 'Library:', Object.keys(at.library || {}));
+
+        const ranks = ['UR', 'SSR', 'SR', 'R'];
+        let totalItems = 0;
+        let html = '';
+        ranks.forEach(rank => {
+            const items = at.getFilteredByRank(at.activeTab, rank);
+            console.log('[updateTreasureList]', rank, ':', items.length, 'items');
+            if (items.length === 0) return;
+            totalItems += items.length;
+            
+            const rankColorClass = `treasure-rank-${rank.toLowerCase()}`;
+            const growthRate = ((at.rankGrowth[rank] - 1) * 100).toFixed(0);
+            
+            html += `
+                <div style="margin-bottom:15px;">
+                    <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+                        <span style="font-size:0.65rem; font-weight:900; padding:2px 5px; border-radius:3px; color:#fff; ${rankColorClass}">${rank}</span>
+                        <span style="font-size:0.6rem; color:#475569;">(成长率: ${growthRate}%)</span>
+                        <div style="flex:1; height:1px; background:#1e293b;"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(55px, 1fr)); gap:8px;">
+            `;
+            
+            items.forEach(item => {
+                const isUnlocked = at.isUnlocked(item.id);
+                const hasShards = at.hasShards(item.id);
+                const data = at.getPlayerData(item.id);
+                const isSelected = at.selectedId === item.id;
+                const rankClass = item.rank.toLowerCase();
+
+                html += `
+                    <div class="treasure-card ${rankClass} ${isUnlocked ? '' : 'locked'} ${hasShards ? 'has-shards' : ''} ${isSelected ? 'selected' : ''}"
+                         onclick="game.selectTreasureItem(${item.id})"
+                         style="
+                            position: relative;
+                            aspect-ratio: 1;
+                            border-radius: 8px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            cursor: pointer;
+                            background: ${isUnlocked ? at.rankColors[item.rank].bg : 'linear-gradient(135deg, #1e293b, #0f172a)'};
+                            border: 2px solid ${isSelected ? '#fff' : (isUnlocked ? 'transparent' : '#334155')};
+                            opacity: ${isUnlocked ? 1 : 0.5};
+                            box-shadow: ${isUnlocked ? at.rankColors[item.rank].shadow : 'none'};
+                         "
+                    >
+                        ${isUnlocked ? `<div style="position:absolute; top:2px; right:2px; font-size:0.55rem; background:rgba(0,0,0,0.5); padding:1px 3px; border-radius:3px; color:#fff;">${data.tier}重</div>` : ''}
+                        ${isUnlocked ? `<div style="position:absolute; bottom:2px; left:2px; font-size:0.55rem; background:rgba(0,0,0,0.5); padding:1px 3px; border-radius:3px; color:#fff;">Lv.${at.getTotalLevel(item.id)}</div>` : ''}
+                        ${hasShards && !isUnlocked ? `<div style="position:absolute; top:-3px; right:-3px; width:12px; height:12px; background:#fbbf24; border-radius:50%; box-shadow:0 0 5px #fbbf24;"></div>` : ''}
+                        <div style="font-size:1.5rem;">${item.icon}</div>
+                    </div>
+                `;
+            });
+            
+            html += '</div></div>';
+        });
+
+        console.log('[updateTreasureList] Total items rendered:', totalItems, 'HTML length:', html.length);
+        container.innerHTML = html;
+    }
+    
+    selectTreasureItem(id) {
+        this.ancientTreasure.selectedId = id;
+        this.updateTreasureUI();
+    }
+    
+    updateTreasureDetail() {
+        const at = this.ancientTreasure;
+        const drawPanel = document.getElementById('treasure-draw-panel');
+        const detailPanel = document.getElementById('treasure-detail-panel');
+
+        if (!at.selectedId) {
+            if (drawPanel) drawPanel.style.display = 'flex';
+            if (detailPanel) detailPanel.style.display = 'none';
+            return;
+        }
+
+        if (drawPanel) drawPanel.style.display = 'none';
+        if (detailPanel) detailPanel.style.display = 'flex';
+
+        const item = at.getTreasureData(at.selectedId);
+        const data = at.getPlayerData(at.selectedId);
+        if (!item) return;
+
+        // 更新图标
+        const iconContainer = document.getElementById('treasure-detail-icon-container');
+        if (iconContainer) {
+            const rankColorClass = `treasure-rank-${item.rank.toLowerCase()}`;
+            iconContainer.className = rankColorClass;
+            iconContainer.innerHTML = item.icon;
+        }
+
+        // 更新名称
+        const nameEl = document.getElementById('treasure-detail-name');
+        if (nameEl) nameEl.innerText = item.name;
+
+        // 更新成长率
+        const growthEl = document.getElementById('treasure-detail-growth');
+        if (growthEl) growthEl.innerText = ((at.rankGrowth[item.rank] - 1) * 100).toFixed(0);
+
+        // 更新属性类型
+        const attrEl = document.getElementById('treasure-detail-attr');
+        if (attrEl) attrEl.innerText = item.attr;
+
+        // 更新战力
+        const powerEl = document.getElementById('treasure-detail-power');
+        if (powerEl) {
+            powerEl.innerText = '×' + at.formatNumber(at.calculateSinglePower(at.selectedId));
+        }
+
+        // 更新下级预览
+        const nextPowerEl = document.getElementById('treasure-detail-next-power');
+        if (nextPowerEl) {
+            nextPowerEl.innerText = '×' + at.formatNumber(at.calculateSinglePower(at.selectedId, 1));
+        }
+
+        // 更新描述
+        const descEl = document.getElementById('treasure-detail-desc');
+        if (descEl) descEl.innerText = item.desc;
+
+        // 更新等级进度
+        const levelEl = document.getElementById('treasure-detail-level');
+        const levelBar = document.getElementById('treasure-detail-level-bar');
+        if (levelEl) levelEl.innerText = data.level;
+        if (levelBar) levelBar.style.width = (data.level / 10 * 100) + '%';
+
+        // 更新碎片数量和升级消耗
+        const shardsEl = document.getElementById('treasure-detail-shards');
+        const costEl = document.getElementById('treasure-detail-cost');
+        const cost = at.getUpgradeCost(at.selectedId);
+        if (shardsEl) shardsEl.innerText = `${data.shards}/${cost}`;
+        if (costEl) costEl.innerText = cost;
+
+        // 更新觉醒效果
+        const awakeningEl = document.getElementById('treasure-detail-awakening');
+        if (awakeningEl) {
+            const awakening = at.getAwakeningEffect(at.selectedId);
+            if (awakening && data.level > 0) {
+                let awakeningText = `★ 觉醒【${awakening.name}】第${awakening.tier}重`;
+                awakeningText += `\n   ${awakening.desc}`;
+
+                // 显示具体加成
+                if (awakening.bonuses.attackMult && awakening.bonuses.attackMult > 1) {
+                    awakeningText += `\n   攻击倍率 ×${awakening.bonuses.attackMult.toFixed(2)}`;
+                }
+                if (awakening.bonuses.hpMult && awakening.bonuses.hpMult > 1) {
+                    awakeningText += `\n   生命倍率 ×${awakening.bonuses.hpMult.toFixed(2)}`;
+                }
+                if (awakening.bonuses.attackExpBonus > 0) {
+                    awakeningText += `\n   攻击指数 +${(awakening.bonuses.attackExpBonus * 100).toFixed(1)}%`;
+                }
+                if (awakening.bonuses.regenBonus > 0) {
+                    awakeningText += `\n   战斗恢复 +${(awakening.bonuses.regenBonus * 100).toFixed(1)}%`;
+                }
+                if (awakening.bonuses.allMult && awakening.bonuses.allMult > 1) {
+                    awakeningText += `\n   全属性倍率 ×${awakening.bonuses.allMult.toFixed(2)}`;
+                }
+
+                awakeningEl.innerText = awakeningText;
+                awakeningEl.style.display = 'block';
+            } else {
+                awakeningEl.style.display = 'none';
+            }
+        }
+
+        // 更新按钮状态
+        const upgradeBtn = document.getElementById('treasure-upgrade-btn');
+        if (upgradeBtn) {
+            upgradeBtn.disabled = data.shards < cost;
+            upgradeBtn.style.opacity = data.shards < cost ? '0.5' : '1';
+        }
     }
     
     gardenOneClickHarvest() {
