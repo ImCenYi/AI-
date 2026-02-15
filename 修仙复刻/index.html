@@ -62,7 +62,7 @@
 
             <!-- Player -->
             <div class="entity player-entity" id="player-entity">
-                <span>🧘</span>
+                <span>⚔️</span>
                 <div class="hp-bar-container">
                     <div class="hp-bar-fill" id="player-hp-bar" style="width: 100%;"></div>
                 </div>
@@ -212,19 +212,19 @@
                     <span style="font-size:0.7rem; color:#888;">(+<span id="garden-overview-essence-rate">0</span>/分)</span>
                 </div>
                 
-                <!-- 经脉淬炼信息 -->
+                <!-- 炼体信息 -->
                 <div style="background: rgba(139,92,246,0.1); border: 1px solid #8b5cf6; border-radius: 8px; padding: 8px; margin: 10px 0;">
-                    <div style="color: #8b5cf6; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">🧘 经脉淬炼</div>
+                    <div style="color: #8b5cf6; font-size: 0.8rem; font-weight: bold; margin-bottom: 5px;">⚔️ 炼体锻身</div>
                     <div class="sub-stat" style="margin:3px 0;">
-                        <span>淬炼轮次:</span>
-                        <span id="garden-overview-refine-round" class="val" style="color:#fbbf24;">0轮</span>
+                        <span>锻体境界:</span>
+                        <span id="garden-overview-refine-realm" class="val" style="color:#888;">第1境·凡胎</span>
                     </div>
                     <div class="sub-stat" style="margin:3px 0;">
                         <span>当前进度:</span>
                         <span><span id="garden-overview-refine-step" class="val">0</span>/10</span>
                     </div>
                     <div class="sub-stat" style="margin:3px 0;">
-                        <span>全属性加成:</span>
+                        <span>肉身强度:</span>
                         <span id="garden-overview-meridian-bonus" class="val" style="color:#ef4444;">×1 / +0%</span>
                     </div>
                 </div>
@@ -365,19 +365,25 @@
         </div>
         
         <div style="display:flex; gap:15px; flex:1; overflow:hidden;">
-            <!-- 左侧：经脉淬炼 -->
+            <!-- 左侧：炼体锻身 -->
             <div style="flex:1; display:flex; flex-direction:column; gap:10px; min-width:220px; max-width:280px;">
-                <!-- 经脉图 -->
+                <!-- 炼体图 -->
                 <div style="background:#1a1a1a; padding:10px; border-radius:8px; flex:1; display:flex; flex-direction:column;">
-                    <h3 style="margin:0 0 10px 0; color:#8b5cf6; font-size:1rem;">🧘 经脉淬炼</h3>
+                    <h3 style="margin:0 0 10px 0; color:#8b5cf6; font-size:1rem;">⚔️ 炼体锻身</h3>
                     
-                    <!-- 经脉图容器 -->
-                    <div id="meridian-map-container" style="flex:1; position:relative; background:radial-gradient(circle at center, #1a1a2e 0%, #0f0f1a 100%); border-radius:8px; min-height:300px; overflow:hidden;">
+                    <!-- 炼体图容器 -->
+                    <div id="meridian-map-container" style="flex:1; position:relative; background:radial-gradient(circle at center, #1a1a2e 0%, #0f0f1a 100%); border-radius:8px; min-height:320px; height:320px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
                         <!-- 由JS生成经脉图 -->
                     </div>
                     
                     <!-- 淬炼信息 -->
                     <div style="margin-top:10px; padding:10px; background:#262626; border-radius:6px;">
+                        <!-- 境界显示 -->
+                        <div style="text-align:center; padding:8px; background:linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%); border-radius:6px; margin-bottom:10px; border:1px solid #333;">
+                            <div style="font-size:0.7rem; color:#888; margin-bottom:3px;">锻体境界</div>
+                            <div id="garden-refine-realm" style="font-size:1.1rem; font-weight:bold; color:#888;">第1境·凡胎</div>
+                            <div id="garden-refine-realm-desc" style="font-size:0.65rem; color:#666; margin-top:2px;">未曾修炼</div>
+                        </div>
                         <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
                             <span style="color:#888;">当前轮次:</span>
                             <span id="garden-refine-round" style="color:#fbbf24; font-weight:bold;">0轮</span>
@@ -386,9 +392,26 @@
                             <span style="color:#888;">当前进度:</span>
                             <span id="garden-refine-step" style="color:#22c55e;">0/10</span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:8px;">
-                            <span style="color:#888;">全属性加成:</span>
+                        <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                            <span style="color:#888;">肉身强度:</span>
                             <span id="garden-meridian-bonus" style="color:#ef4444; font-weight:bold;">×1 / +0%</span>
+                        </div>
+                        
+                        <!-- 下一级预览 -->
+                        <div style="background:linear-gradient(135deg, #1a2f1a 0%, #0f1f0f 100%); border:1px solid #22c55e40; border-radius:6px; padding:8px; margin:8px 0;">
+                            <div style="font-size:0.7rem; color:#22c55e; margin-bottom:4px;">🎯 下一级突破</div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:3px;">
+                                <span style="color:#888;">当前:</span>
+                                <span id="garden-preview-current" style="color:#aaa;">×1</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem; margin-bottom:3px;">
+                                <span style="color:#888;">突破后:</span>
+                                <span id="garden-preview-next" style="color:#fbbf24; font-weight:bold;">×1.1</span>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; font-size:0.75rem;">
+                                <span style="color:#888;">收益:</span>
+                                <span id="garden-preview-gain" style="color:#4ade80;">×1.1 全属性</span>
+                            </div>
                         </div>
                         <div style="border-top:1px solid #444; padding-top:8px; margin-top:8px;">
                             <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
@@ -404,11 +427,11 @@
                     
                     <!-- 淬炼按钮 -->
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:10px;">
-                        <button class="sys-btn" style="background:linear-gradient(to right, #7c3aed, #8b5cf6); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAndUpdate()">
-                            淬炼经脉
+                        <button class="sys-btn" style="background:linear-gradient(to right, #dc2626, #ef4444); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAndUpdate()">
+                            🔥 锻体强身
                         </button>
-                        <button class="sys-btn" style="background:linear-gradient(to right, #4c1d95, #6d28d9); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAll()">
-                            一键淬炼
+                        <button class="sys-btn" style="background:linear-gradient(to right, #991b1b, #b91c1c); font-size:0.8rem; padding:8px;" onclick="game.garden.refinement.refineAll()">
+                            ⚔️ 连续锻体
                         </button>
                     </div>
                 </div>
@@ -646,21 +669,22 @@
                 </div>
             </div>
             
-            <!-- 经脉淬炼加成 -->
+            <!-- 炼体加成 -->
             <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
-                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">🧘 经脉淬炼 (百草灵园)</div>
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">⚔️ 炼体锻身 (百草灵园)</div>
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 0.8rem;">
-                    <div>经脉加成: <span id="detail-meridian-mult" class="val" style="color:#8b5cf6">-</span></div>
-                    <div>淬炼轮次: <span id="detail-meridian-round" class="val">-</span></div>
+                    <div>锻体境界: <span id="detail-meridian-realm" class="val" style="color:#22c55e">-</span></div>
+                    <div>锻体轮次: <span id="detail-meridian-round" class="val">-</span></div>
+                    <div>肉身加成: <span id="detail-meridian-mult" class="val" style="color:#8b5cf6">-</span></div>
                 </div>
             </div>
             
             <!-- 计算说明 -->
             <div style="background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; font-size: 0.75rem; color: #666;">
                 <div style="color: #888; margin-bottom: 5px;">📝 计算公式</div>
-                <div>最终攻击 = (基础攻击 + 装备攻击) × 法则攻击倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 经脉乘算，然后指数+经脉指数加成%</div>
-                <div>最终生命 = (基础生命 + 装备生命) × 法则生命倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 经脉乘算，然后指数+经脉指数加成%</div>
-                <div style="color: #8b5cf6; margin-top: 5px;">💡 经脉加成：前9次×1.1，最后1次指数+0.1%</div>
+                <div>最终攻击 = (基础攻击 + 装备攻击) × 法则攻击倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 肉身乘算，然后指数+肉身蜕变%</div>
+                <div>最终生命 = (基础生命 + 装备生命) × 法则生命倍率 × 秘宝全属性倍率 × 遗宝全属性倍率 × 境界加成 × 肉身乘算，然后指数+肉身蜕变%</div>
+                <div style="color: #8b5cf6; margin-top: 5px;">💡 炼体加成：前9次锻体×1.1，最后1次打通经脉肉身蜕变+0.1%</div>
             </div>
         </div>
         

@@ -1369,9 +1369,14 @@ class Game {
         if (this.garden && this.garden.refinement) {
             const refinement = this.garden.refinement;
             const expBonus = refinement.getTotalExpBonus();
+            const currentRealm = refinement.getCurrentRealm();
+            document.getElementById('detail-meridian-realm').innerText = currentRealm.displayName;
+            document.getElementById('detail-meridian-realm').style.color = currentRealm.color;
             document.getElementById('detail-meridian-mult').innerText = '×' + formatNum(refinement.totalMultiplier) + ' / +' + (expBonus * 100).toFixed(1) + '%';
             document.getElementById('detail-meridian-round').innerText = refinement.refinementRound + '轮';
         } else {
+            document.getElementById('detail-meridian-realm').innerText = '第1境·凡胎';
+            document.getElementById('detail-meridian-realm').style.color = '#888';
             document.getElementById('detail-meridian-mult').innerText = '×1 / +0%';
             document.getElementById('detail-meridian-round').innerText = '0轮';
         }
@@ -1543,7 +1548,7 @@ class Game {
         const overviewMature = document.getElementById('garden-overview-mature');
         
         // 经脉淬炼信息
-        const overviewRefineRound = document.getElementById('garden-overview-refine-round');
+        const overviewRefineRealm = document.getElementById('garden-overview-refine-realm');
         const overviewRefineStep = document.getElementById('garden-overview-refine-step');
         const overviewMeridianBonus = document.getElementById('garden-overview-meridian-bonus');
         
@@ -1558,7 +1563,11 @@ class Game {
         if (overviewEssenceRate) overviewEssenceRate.innerText = formatNum(rates.essencePerMin);
         
         // 更新经脉淬炼信息
-        if (overviewRefineRound) overviewRefineRound.innerText = refinement.refinementRound + '轮';
+        const currentRealm = refinement.getCurrentRealm();
+        if (overviewRefineRealm) {
+            overviewRefineRealm.innerText = currentRealm.displayName;
+            overviewRefineRealm.style.color = currentRealm.color;
+        }
         if (overviewRefineStep) overviewRefineStep.innerText = refinement.refinementStep;
         if (overviewMeridianBonus) {
             const expBonus = refinement.getTotalExpBonus();
@@ -1704,6 +1713,8 @@ class Game {
         const meridianBonusEl = document.getElementById('garden-meridian-bonus');
         const lifeEssenceEl = document.getElementById('garden-life-essence');
         const refineCostEl = document.getElementById('garden-refine-cost');
+        const refineRealmEl = document.getElementById('garden-refine-realm');
+        const refineRealmDescEl = document.getElementById('garden-refine-realm-desc');
         
         if (refineRoundEl) refineRoundEl.innerText = refinement.refinementRound + '轮';
         if (refineStepEl) refineStepEl.innerText = refinement.refinementStep + '/10';
@@ -1713,6 +1724,25 @@ class Game {
         }
         if (lifeEssenceEl) lifeEssenceEl.innerText = formatNum(refinement.lifeEssence);
         if (refineCostEl) refineCostEl.innerText = formatNum(refinement.getRefinementCost());
+        
+        // 更新下一级预览
+        const previewCurrent = document.getElementById('garden-preview-current');
+        const previewNext = document.getElementById('garden-preview-next');
+        const previewGain = document.getElementById('garden-preview-gain');
+        if (previewCurrent && previewNext && previewGain) {
+            const preview = refinement.getNextLevelPreview();
+            previewCurrent.innerText = preview.current;
+            previewNext.innerText = preview.next;
+            previewGain.innerText = preview.gain;
+        }
+        
+        // 更新境界信息
+        const currentRealm = refinement.getCurrentRealm();
+        if (refineRealmEl) {
+            refineRealmEl.innerText = currentRealm.displayName;
+            refineRealmEl.style.color = currentRealm.color;
+        }
+        if (refineRealmDescEl) refineRealmDescEl.innerText = currentRealm.desc;
         
         // Update land grid (create once, then efficient update)
         const landGrid = document.getElementById('modal-land-grid');
