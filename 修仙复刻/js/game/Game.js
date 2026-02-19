@@ -71,12 +71,24 @@ class Game {
         this.ancientTreasureBonuses = {};
         this.treasureDrawTokens = 0; // 寻宝令
         this.isTreasureModalOpen = false;
-        
+
+        // ZhouTian System (周天星窍系统)
+        this.zhouTian = new ZhouTianSystem(this);
+        this.zhouTianBonuses = {};
+        this.zhouTianExponentBonus = 0;
+        this.isZhouTianModalOpen = false;
+        this.selectedSectorForWash = null; // 星座图中选中的星域
+
+        // StarBeast Dungeon (星空巨兽副本)
+        this.starBeast = new StarBeastDungeon(this);
+        this.isStarBeastModalOpen = false;
+
         this.isDead = false;
         this.lastTick = Date.now();
         this.autoChallenge = false;
         this.lastBossDeathTime = 0;
-        
+        this.lastMarrowTick = Date.now(); // 星髓自动获取计时
+
         this.initUI();
         this.spawnWildWave();
         this.updateRealmUI(); // Initialize realm UI
@@ -97,7 +109,9 @@ class Game {
         this.updateStatsUI();
         this.updateSystemUI();
         this.updateTreasureUI();
+        this.updateZhouTianUI();
         this.dungeon.updateUI();
+        if (this.starBeast) this.starBeast.updateUI();
     }
 
     getIcon(slot) {
@@ -173,6 +187,33 @@ class Game {
             }
         }
 
+        // Apply ZhouTian System bonus (周天星窍加成)
+        if (this.zhouTian) {
+            const ztBonuses = this.zhouTian.getAllBonuses();
+
+            // 青龙 - 攻击加成
+            if (ztBonuses.attack && ztBonuses.attack.value > 1) {
+                stats.atk = stats.atk.mul(ztBonuses.attack.value);
+            }
+
+            // 朱雀 - 生命加成
+            if (ztBonuses.health && ztBonuses.health.value > 1) {
+                maxHp = maxHp.mul(ztBonuses.health.value);
+            }
+
+            // 麒麟 - 全属性加成
+            if (ztBonuses.allStats && ztBonuses.allStats.value > 1) {
+                stats.atk = stats.atk.mul(ztBonuses.allStats.value);
+                maxHp = maxHp.mul(ztBonuses.allStats.value);
+            }
+
+            // 周天大圆满指数加成
+            if (this.zhouTianExponentBonus > 0) {
+                stats.atk = stats.atk.expBonus(this.zhouTianExponentBonus);
+                maxHp = maxHp.expBonus(this.zhouTianExponentBonus);
+            }
+        }
+
         return { ...stats, maxHp };
     }
 
@@ -186,8 +227,26 @@ class Game {
     }
 
     getRealmBonus() {
-        // Each realm level gives 10% bonus, compounded
-        return new BigNum(REALM_BONUS_BASE).pow(this.realmIndex);
+        // 使用config.js中的新境界加成计算（基于跨度）
+        return getRealmBonus(this.realmIndex);
+    }
+
+    /**
+     * 获取下一次突破的倍率预览
+     */
+    getNextBreakthroughMultiplier() {
+        if (!this.canBreakthrough()) return new BigNum(1);
+        return getRealmBreakthroughMultiplier(this.realmIndex + 1);
+    }
+
+    /**
+     * 获取当前突破的跨度（N难度差）
+     */
+    getCurrentBreakthroughSpan() {
+        const currentRealm = getRealmInfo(this.realmIndex);
+        const nextRealm = getRealmInfo(this.realmIndex + 1);
+        if (!nextRealm) return 0;
+        return nextRealm.requiredDifficulty - currentRealm.requiredDifficulty;
     }
 
     canBreakthrough() {
@@ -265,13 +324,17 @@ class Game {
         const nextRealm = this.getNextRealm();
         const canBreak = this.canBreakthrough();
         const bonus = this.getRealmBonus();
-        
+
+        // 计算突破跨度和倍率
+        const span = this.getCurrentBreakthroughSpan();
+        const nextMultiplier = this.getNextBreakthroughMultiplier();
+
         // Update header display
         const levelDisplay = document.getElementById('level-display');
         if (levelDisplay) {
             levelDisplay.innerText = `荒野层数: ${this.difficulty} (${currentRealm.name})`;
         }
-        
+
         // Update realm panel if elements exist
         const realmNameEl = document.getElementById('realm-name');
         const realmBonusEl = document.getElementById('realm-bonus');
@@ -279,24 +342,30 @@ class Game {
         const realmReqEl = document.getElementById('realm-req');
         const realmProgressEl = document.getElementById('realm-progress');
         const realmBtn = document.getElementById('btn-realm-challenge');
-        
+        const realmSpanEl = document.getElementById('realm-span');
+        const realmMultiplierEl = document.getElementById('realm-multiplier');
+
         if (realmNameEl) realmNameEl.innerText = currentRealm.name;
         if (realmBonusEl) realmBonusEl.innerText = `x${formatNum(bonus)}`;
         if (nextRealmEl) nextRealmEl.innerText = nextRealm.name;
         if (realmReqEl) realmReqEl.innerText = `N${nextRealm.requiredDifficulty}`;
-        
+
+        // 显示跨度和倍率
+        if (realmSpanEl) realmSpanEl.innerText = `跨越 ${span} 层`;
+        if (realmMultiplierEl) realmMultiplierEl.innerText = `突破倍率 x${formatNum(nextMultiplier)}`;
+
         if (realmProgressEl) {
             const progress = Math.min(100, Math.floor((this.maxDifficulty / nextRealm.requiredDifficulty) * 100));
             realmProgressEl.innerText = `${this.maxDifficulty}/${nextRealm.requiredDifficulty} (${progress}%)`;
         }
-        
+
         if (realmBtn) {
             if (this.isRealmBossAlive()) {
                 realmBtn.innerText = '⚔️ 天劫战斗中...';
                 realmBtn.classList.add('active');
                 realmBtn.disabled = false;
             } else if (canBreak) {
-                realmBtn.innerText = '☯️ 挑战境界天劫';
+                realmBtn.innerText = `☯️ 突破至${nextRealm.name} (x${formatNum(nextMultiplier)})`;
                 realmBtn.classList.remove('active');
                 realmBtn.disabled = false;
             } else {
@@ -311,7 +380,7 @@ class Game {
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','dungeon','realm','garden','ancient-treasure','abyss'].indexOf(tab);
+        const btnIdx = ['law','dungeon','realm','garden','ancient-treasure','zhou-tian','abyss'].indexOf(tab);
         document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
         
@@ -336,6 +405,11 @@ class Game {
         // Update ancient treasure overview when switching to ancient-treasure tab
         if (tab === 'ancient-treasure') {
             this.updateTreasureUI();
+        }
+
+        // Update ZhouTian overview when switching to zhou-tian tab
+        if (tab === 'zhou-tian') {
+            this.updateZhouTianUI();
         }
     }
 
@@ -457,7 +531,14 @@ class Game {
         if (this.abyssDungeon) {
             this.abyssDungeon.update();
         }
-        
+
+        // 星髓自动获取（每分钟100）
+        if (this.zhouTian && now - this.lastMarrowTick >= 60000) {
+            this.zhouTian.addMarrow(100);
+            this.lastMarrowTick = now;
+            this.updateZhouTianUI();
+        }
+
         requestAnimationFrame(() => this.loop());
     }
 
@@ -480,8 +561,8 @@ class Game {
         
         // Damage (Player -> Enemy)
         let atk = pStats.atk;
-        if (this.mode === 'dungeon' || this.mode === 'abyss') {
-            // 数值压缩：用于副本和深渊
+        if (this.mode === 'dungeon' || this.mode === 'abyss' || this.mode === 'starbeast') {
+            // 数值压缩：用于副本、深渊和星空巨兽
             let logVal = atk.log10();
             if(logVal < 0) logVal = 0;
             atk = new BigNum(Math.pow(logVal, 2));
@@ -504,26 +585,38 @@ class Game {
             totalDmg = totalDmg.add(e.atk);
         });
 
-        if (this.mode === 'dungeon' || this.mode === 'abyss') {
-            // 数值压缩：用于副本和深渊
+        if (this.mode === 'dungeon' || this.mode === 'abyss' || this.mode === 'starbeast') {
+            // 数值压缩：用于副本、深渊和星空巨兽
             let logHp = pStats.maxHp.log10();
             if(logHp < 0) logHp = 0;
             const ehpVal = Math.pow(logHp, 2) * 5;
-            
+
             if (ehpVal < 1) {
-                this.currentHp = new BigNum(0); 
+                this.currentHp = new BigNum(0);
             } else {
                 let pct = totalDmg.div(new BigNum(ehpVal));
                 let realDmg = this.currentHp.mul(pct);
                 this.currentHp = this.currentHp.sub(realDmg);
-                if(realDmg.gt(0)) this.showDamage(realDmg, 'player'); 
+                if(realDmg.gt(0)) this.showDamage(realDmg, 'player');
             }
         } else {
             this.currentHp = this.currentHp.sub(totalDmg);
             if(totalDmg.gt(0)) this.showDamage(totalDmg, 'player');
         }
 
-        if (this.currentHp.lte(0)) this.handleLoss();
+        if (this.currentHp.lte(0)) {
+            if (this.mode === 'starbeast' && this.starBeast) {
+                this.starBeast.handleDefeat();
+            } else {
+                this.handleLoss();
+            }
+        }
+
+        // 检查星空巨兽战斗胜利（敌人被击败）
+        if (this.mode === 'starbeast' && this.enemies.length === 0 && this.starBeast?.active) {
+            this.starBeast.handleVictory();
+        }
+
         this.updateCombatUI();
     }
 
@@ -545,18 +638,36 @@ class Game {
             this.handleRealmBossKill();
             return;
         }
-        
+
         // Check if it's an abyss boss
         if (enemy.isAbyssBoss) {
             this.abyssDungeon.handleAbyssBossDeath(enemy);
             // 深渊BOSS死亡后不生成野生波次
             return;
         }
-        
+
+        // 星髓掉落
+        if (this.zhouTian) {
+            let marrowDrop = 0;
+            if (enemy.isBoss) {
+                // BOSS掉落 20-50 星髓
+                marrowDrop = Math.floor(Math.random() * 31) + 20;
+            } else {
+                // 普通敌人 10% 几率掉落 5-15 星髓
+                if (Math.random() < 0.1) {
+                    marrowDrop = Math.floor(Math.random() * 11) + 5;
+                }
+            }
+            if (marrowDrop > 0) {
+                this.zhouTian.addMarrow(marrowDrop);
+                // 不显示日志避免刷屏，只在UI更新
+            }
+        }
+
         if (this.mode === 'tower') {
             if (enemy.isBoss) {
                 this.towerLevel++;
-                this.lastBossDeathTime = Date.now(); 
+                this.lastBossDeathTime = Date.now();
                 this.log('GAIN', '击败塔主！层数+1');
                 this.rollTowerLoot(true);
                 this.updateButtons();
@@ -991,6 +1102,14 @@ class Game {
                 this.treasureDrawTokens += val.toNumber();
                 this.log('SYS', `金手指: 古宝寻宝令 +${formatNum(val)}`);
                 break;
+            case 'zhouTianMarrow':
+                // 添加周天星髓
+                if (this.zhouTian) {
+                    this.zhouTian.state.marrow += val.toNumber();
+                    this.log('SYS', `金手指: 周天星髓 +${formatNum(val)}`);
+                    this.updateZhouTianUI();
+                }
+                break;
             case 'currentDiff':
                 // 增加当前难度并解锁相应系统
                 const oldDiff = this.difficulty;
@@ -1007,6 +1126,7 @@ class Game {
         this.updateStatsUI();
         this.updateSystemUI();
         this.updateTreasureUI();
+        this.updateZhouTianUI();
         this.closeModal('cheat-modal');
     }
     
@@ -1325,6 +1445,8 @@ class Game {
         // 境界加成
         document.getElementById('detail-realm-name').innerText = currentRealm.name;
         document.getElementById('detail-realm-bonus').innerText = 'x' + formatNum(realmBonus);
+        const realmCountEl = document.getElementById('detail-realm-count');
+        if (realmCountEl) realmCountEl.innerText = this.realmIndex + '次';
         
         // 计算装备总加成
         let equipAtk = new BigNum(0);
@@ -2442,7 +2564,545 @@ class Game {
             bonusPreview.innerHTML = bonusTexts.map(t => `<div style="color:#a78bfa;">${t}</div>`).join('');
         }
     }
-    
+
+    // ==================== ZhouTian System (周天星窍系统) ====================
+
+    updateZhouTianUI() {
+        if (!this.zhouTian) return;
+
+        const state = this.zhouTian.state;
+        const allBonuses = this.zhouTian.getAllBonuses();
+
+        // 更新概览页
+        const updateEl = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.innerText = value;
+        };
+
+        updateEl('zhou-tian-level', `第${state.level}周天`);
+        updateEl('zhou-tian-exp-bonus', `+${(state.completions * 0.1).toFixed(1)}%`);
+        updateEl('zhou-tian-complete-count', `${this.zhouTian.getCompleteSectorCount()}/5`);
+        updateEl('zhou-tian-progress', `${(this.zhouTian.getCompleteSectorCount() / 5 * 100).toFixed(0)}%`);
+
+        // 更新进度条
+        const progressBar = document.getElementById('zhou-tian-progress');
+        if (progressBar) {
+            progressBar.style.width = `${this.zhouTian.getCompleteSectorCount() / 5 * 100}%`;
+        }
+
+        // 更新属性显示（使用新的加成结构）
+        const formatBonus = (bonus) => {
+            if (bonus.type === 'multiply') {
+                return `×${bonus.value.toFixed(2)}`;
+            } else {
+                return `+${bonus.value.toFixed(0)}`;
+            }
+        };
+
+        updateEl('zhou-tian-atk', formatBonus(allBonuses.attack));
+        updateEl('zhou-tian-hp', formatBonus(allBonuses.health));
+        updateEl('zhou-tian-equip', formatBonus(allBonuses.equipLevel));
+        updateEl('zhou-tian-essence', formatBonus(allBonuses.lifeEssence));
+        updateEl('zhou-tian-all', formatBonus(allBonuses.allStats));
+        updateEl('zhou-tian-marrow-count', state.marrow.toLocaleString());
+
+        // 更新弹窗（如果打开）
+        if (this.isZhouTianModalOpen) {
+            this.updateZhouTianModal();
+        }
+    }
+
+    openZhouTianModal() {
+        this.isZhouTianModalOpen = true;
+        const modal = document.getElementById('zhou-tian-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+            this.updateZhouTianModal();
+        }
+    }
+
+    closeZhouTianModal() {
+        this.isZhouTianModalOpen = false;
+        const modal = document.getElementById('zhou-tian-modal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    updateZhouTianModal() {
+        if (!this.zhouTian) return;
+
+        const state = this.zhouTian.state;
+        const sectors = this.zhouTian.sectors;
+        const qualities = this.zhouTian.qualities;
+        const layout = this.zhouTian.constellationLayout;
+
+        // 更新右侧信息
+        document.getElementById('zhou-tian-modal-marrow').innerText = state.marrow.toLocaleString();
+        document.getElementById('zhou-tian-modal-level').innerText = `第${state.level}周天`;
+        document.getElementById('zhou-tian-modal-exp').innerText = `+${(state.completions * 0.1).toFixed(1)}%`;
+        // 计算总锁定数（每个区域4个，共20个）
+        const totalLocks = state.locks.length;
+        const maxLocks = 20;
+        document.getElementById('zhou-tian-modal-locks').innerText = `${totalLocks}/${maxLocks}`;
+
+        // 更新各星域加成
+        const allBonuses = this.zhouTian.getAllBonuses();
+        const formatBonusValue = (bonus) => bonus.type === 'multiply' ? `×${bonus.value.toFixed(2)}` : `+${bonus.value.toFixed(0)}`;
+
+        document.getElementById('modal-bonus-attack').innerText = formatBonusValue(allBonuses.attack);
+        document.getElementById('modal-bonus-health').innerText = formatBonusValue(allBonuses.health);
+        document.getElementById('modal-bonus-equip').innerText = formatBonusValue(allBonuses.equipLevel);
+        document.getElementById('modal-bonus-essence').innerText = formatBonusValue(allBonuses.lifeEssence);
+        document.getElementById('modal-bonus-all').innerText = formatBonusValue(allBonuses.allStats);
+
+        // 更新各星域锁定数
+        for (let sIdx = 0; sIdx < 5; sIdx++) {
+            const lockEl = document.getElementById(`modal-locks-${sIdx}`);
+            if (lockEl) {
+                const count = this.zhouTian.getSectorLockCount(sIdx);
+                lockEl.innerText = `🔒${count}/4`;
+                lockEl.style.opacity = count > 0 ? '1' : '0.5';
+            }
+        }
+
+        // 渲染星座图
+        this.renderConstellationMap();
+
+        // 更新突破按钮显示状态
+        const breakthroughPanel = document.getElementById('breakthrough-panel');
+        if (breakthroughPanel) {
+            const canBreak = this.zhouTian.canBreakthrough();
+            const isBreaking = this.zhouTian.breakthroughActive;
+            breakthroughPanel.style.display = canBreak ? 'block' : 'none';
+
+            // 突破中禁用按钮
+            const btn = breakthroughPanel.querySelector('button');
+            if (btn) {
+                btn.disabled = isBreaking;
+                btn.style.opacity = isBreaking ? '0.5' : '1';
+                btn.innerText = isBreaking ? '🚀 突破中...' : '🚀 突破周天';
+            }
+        }
+
+        // 更新日志
+        const logsContainer = document.getElementById('zhou-tian-logs');
+        if (logsContainer) {
+            logsContainer.innerHTML = this.zhouTian.logs.map(log =>
+                `<div style="color:#64748b; font-size:0.65rem; border-left:2px solid #333; padding-left:6px;">${log}</div>`
+            ).join('');
+        }
+    }
+
+    // 渲染星座图
+    renderConstellationMap() {
+        const state = this.zhouTian.state;
+        const sectors = this.zhouTian.sectors;
+        const qualities = this.zhouTian.qualities;
+        const layout = this.zhouTian.constellationLayout;
+
+        const pointsContainer = document.getElementById('constellation-points');
+        const labelsContainer = document.getElementById('constellation-labels');
+        const linesSvg = document.getElementById('constellation-lines');
+
+        if (!pointsContainer || !labelsContainer || !linesSvg) return;
+
+        pointsContainer.innerHTML = '';
+        labelsContainer.innerHTML = '';
+        linesSvg.innerHTML = '';
+
+        // 渲染星域标签
+        const labelPositions = [
+            { x: 25, y: 10, name: '🐉 青龙', color: '#22c55e' },
+            { x: 75, y: 10, name: '🦅 朱雀', color: '#ef4444' },
+            { x: 75, y: 90, name: '🐅 白虎', color: '#f59e0b' },
+            { x: 25, y: 90, name: '🐢 玄武', color: '#3b82f6' },
+            { x: 50, y: 50, name: '🦌 麒麟', color: '#a855f7' }
+        ];
+
+        labelPositions.forEach(label => {
+            const labelEl = document.createElement('div');
+            labelEl.style.cssText = `
+                position: absolute;
+                left: ${label.x}%;
+                top: ${label.y}%;
+                transform: translate(-50%, -50%);
+                font-size: 0.75rem;
+                font-weight: bold;
+                color: ${label.color};
+                text-shadow: 0 0 10px ${label.color}40;
+                pointer-events: none;
+            `;
+            labelEl.innerText = label.name;
+            labelsContainer.appendChild(labelEl);
+        });
+
+        // 渲染星窍点位和连线
+        const points = [];
+
+        layout.forEach((sectorLayout, sIdx) => {
+            const isPreviewing = state.preview.sectorIdx === sIdx;
+            const sector = sectors[sIdx];
+
+            sectorLayout.positions.forEach((pos, i) => {
+                const globalIdx = sIdx * 5 + i;
+                const quality = isPreviewing ? state.preview.data[i] : state.acupoints[globalIdx];
+                const q = qualities[quality - 1];
+                const isLocked = state.locks.includes(globalIdx);
+                const bonus = this.zhouTian.getAcupointBonus(globalIdx);
+                const baseConfig = this.zhouTian.baseBonuses[sector.attr];
+
+                points.push({ x: pos.x, y: pos.y, globalIdx, sector, q, isLocked, quality, bonus, baseConfig });
+
+                // 属性简称映射
+                const attrShortNames = {
+                    attack: '攻',
+                    health: '血',
+                    equipLevel: '装',
+                    lifeEssence: '精',
+                    allStats: '全'
+                };
+                const attrName = attrShortNames[sector.attr] || '';
+
+                // 创建星窍容器（包含按钮、加成显示）
+                const container = document.createElement('div');
+                container.style.cssText = `
+                    position: absolute;
+                    left: ${pos.x}%;
+                    top: ${pos.y}%;
+                    transform: translate(-50%, -50%);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    z-index: 10;
+                `;
+
+                // 星窍按钮
+                const btn = document.createElement('button');
+                btn.style.cssText = `
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 50%;
+                    background: ${isLocked ? '#1a3a1a' : q.bg};
+                    border: 2px solid ${isLocked ? '#22c55e' : q.color};
+                    box-shadow: 0 0 ${quality * 3}px ${q.color}40;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 0.7rem;
+                    font-weight: bold;
+                    color: ${q.color};
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    ${isPreviewing ? 'animation: pulse 1s infinite;' : ''}
+                    ${isLocked ? 'position: relative;' : ''}
+                `;
+                btn.innerText = q.name;
+
+                // 锁定图标显示在按钮上
+                if (isLocked) {
+                    const lockIcon = document.createElement('div');
+                    lockIcon.style.cssText = `
+                        position: absolute;
+                        bottom: -2px;
+                        right: -2px;
+                        width: 14px;
+                        height: 14px;
+                        background: #22c55e;
+                        border-radius: 50%;
+                        font-size: 8px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    `;
+                    lockIcon.innerText = '🔒';
+                    btn.appendChild(lockIcon);
+                }
+
+                btn.onmouseenter = () => this.showAcupointTooltip(globalIdx, btn);
+                btn.onclick = () => this.selectAcupoint(globalIdx);
+                btn.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    this.zhouTianToggleLock(globalIdx);
+                };
+                container.appendChild(btn);
+
+                // 容器绑定mouseleave，确保离开整个星窍区域时关闭tooltip
+                container.onmouseleave = () => this.hideAcupointTooltip();
+
+                // 加成显示（包含属性名称）
+                const bonusValueText = baseConfig.type === 'multiply' ? `×${bonus.toFixed(2)}` : `+${bonus.toFixed(0)}`;
+                const bonusText = `${attrName}${bonusValueText}`;
+                const bonusEl = document.createElement('div');
+                bonusEl.style.cssText = `
+                    font-size: 0.6rem;
+                    color: ${q.color};
+                    margin-top: 2px;
+                    text-shadow: 0 0 3px ${q.color}40;
+                    white-space: nowrap;
+                    font-weight: bold;
+                `;
+                bonusEl.innerText = bonusText;
+                container.appendChild(bonusEl);
+
+                pointsContainer.appendChild(container);
+
+                // 绘制与下一个点的连线（简单的星座连线）
+                if (i < sectorLayout.positions.length - 1) {
+                    const nextPos = sectorLayout.positions[i + 1];
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', `${pos.x}%`);
+                    line.setAttribute('y1', `${pos.y}%`);
+                    line.setAttribute('x2', `${nextPos.x}%`);
+                    line.setAttribute('y2', `${nextPos.y}%`);
+                    line.setAttribute('stroke', sector.color);
+                    line.setAttribute('stroke-width', '1');
+                    line.setAttribute('stroke-opacity', '0.3');
+                    linesSvg.appendChild(line);
+                }
+            });
+        });
+
+        // 绘制星域之间的连线（麒麟连接四象）
+        const centerPoint = layout[4].positions[2]; // 麒麟中心
+        [0, 1, 2, 3].forEach(sIdx => {
+            const sectorCenter = layout[sIdx].positions[2]; // 各星域中心点
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', `${centerPoint.x}%`);
+            line.setAttribute('y1', `${centerPoint.y}%`);
+            line.setAttribute('x2', `${sectorCenter.x}%`);
+            line.setAttribute('y2', `${sectorCenter.y}%`);
+            line.setAttribute('stroke', '#fbbf24');
+            line.setAttribute('stroke-width', '1');
+            line.setAttribute('stroke-opacity', '0.2');
+            line.setAttribute('stroke-dasharray', '4,4');
+            linesSvg.appendChild(line);
+        });
+
+        // 更新洗练面板
+        this.updateWashPanel();
+    }
+
+    // 显示星窍提示
+    showAcupointTooltip(globalIdx, element) {
+        // 先关闭已有tooltip
+        this.hideAcupointTooltip();
+
+        const sectorIdx = Math.floor(globalIdx / 5);
+        const sector = this.zhouTian.sectors[sectorIdx];
+        const quality = this.zhouTian.state.acupoints[globalIdx];
+        const q = this.zhouTian.qualities[quality - 1];
+        const bonus = this.zhouTian.getAcupointBonus(globalIdx);
+        const baseConfig = this.zhouTian.baseBonuses[sector.attr];
+
+        const tooltip = document.createElement('div');
+        tooltip.id = 'acupoint-tooltip';
+        tooltip.style.cssText = `
+            position: fixed;
+            background: #1a1a1a;
+            border: 1px solid ${q.color};
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            color: #fff;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        `;
+
+        const bonusText = baseConfig.type === 'multiply' ? `×${bonus.toFixed(2)}` : `+${bonus.toFixed(0)}`;
+
+        tooltip.innerHTML = `
+            <div style="color:${q.color}; font-weight:bold; margin-bottom:4px;">${sector.name} - ${q.name}品</div>
+            <div style="color:#888; font-size:0.7rem;">${baseConfig.desc}</div>
+            <div style="color:#fbbf24; font-weight:bold;">${bonusText}</div>
+        `;
+
+        document.body.appendChild(tooltip);
+
+        const rect = element.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + rect.width/2 - tooltip.offsetWidth/2}px`;
+        tooltip.style.top = `${rect.top - tooltip.offsetHeight - 8}px`;
+    }
+
+    hideAcupointTooltip() {
+        const tooltip = document.getElementById('acupoint-tooltip');
+        if (tooltip) tooltip.remove();
+    }
+
+    // 选择星窍
+    selectAcupoint(globalIdx) {
+        const sectorIdx = Math.floor(globalIdx / 5);
+        const sector = this.zhouTian.sectors[sectorIdx];
+        const quality = this.zhouTian.state.acupoints[globalIdx];
+        const q = this.zhouTian.qualities[quality - 1];
+        const bonus = this.zhouTian.getAcupointBonus(globalIdx);
+        const baseConfig = this.zhouTian.baseBonuses[sector.attr];
+
+        // 显示详情
+        const detailPanel = document.getElementById('acupoint-detail');
+        const sectorName = document.getElementById('detail-sector-name');
+        const qualityEl = document.getElementById('detail-quality');
+        const bonusEl = document.getElementById('detail-bonus');
+        const nextBonusEl = document.getElementById('detail-next-bonus');
+
+        detailPanel.style.display = 'block';
+        sectorName.innerText = sector.name;
+        sectorName.style.color = sector.color;
+
+        qualityEl.innerText = `${q.name}品`;
+        qualityEl.style.background = q.bg;
+        qualityEl.style.color = q.color;
+
+        const bonusText = baseConfig.type === 'multiply' ? `×${bonus.toFixed(3)}` : `+${bonus.toFixed(1)}`;
+        bonusEl.innerText = `${baseConfig.desc} ${bonusText}`;
+
+        // 计算下一级加成
+        if (quality < 5) {
+            const nextQuality = quality + 1;
+            const nextQ = this.zhouTian.qualities[nextQuality - 1];
+            let nextBonus;
+            if (baseConfig.type === 'multiply') {
+                nextBonus = Math.pow(baseConfig.value, nextQuality);
+            } else {
+                nextBonus = baseConfig.value * nextQuality;
+            }
+            const nextText = baseConfig.type === 'multiply' ? `×${nextBonus.toFixed(3)}` : `+${nextBonus.toFixed(1)}`;
+            nextBonusEl.innerText = `${nextQ.name}品 ${nextText}`;
+            nextBonusEl.style.color = nextQ.color;
+        } else {
+            nextBonusEl.innerText = '已达最高品质';
+            nextBonusEl.style.color = '#888';
+        }
+
+        // 选中星域用于洗练
+        this.selectedSectorForWash = sectorIdx;
+        this.updateWashPanel();
+    }
+
+    // 更新洗练面板
+    updateWashPanel() {
+        const panel = document.getElementById('sector-wash-panel');
+        if (!panel) return;
+
+        if (this.selectedSectorForWash === undefined || this.selectedSectorForWash === null) {
+            panel.style.display = 'none';
+            return;
+        }
+
+        const sIdx = this.selectedSectorForWash;
+        const sector = this.zhouTian.sectors[sIdx];
+        const state = this.zhouTian.state;
+        const isPreviewing = state.preview.sectorIdx === sIdx;
+
+        panel.style.display = 'block';
+        document.getElementById('wash-sector-name').innerText = sector.name;
+        document.getElementById('wash-sector-name').style.color = sector.color;
+
+        const cost = this.zhouTian.getWashCost(sIdx);
+        const costDisplay = document.getElementById('wash-cost-display');
+
+        if (isPreviewing) {
+            costDisplay.innerText = '预览中...';
+            document.getElementById('wash-buttons').innerHTML = `
+                <button onclick="game.zhouTianConfirmWash(true)" style="flex:1; padding:8px; background:#14532d; border:none; border-radius:6px; color:#4ade80; font-size:0.75rem; cursor:pointer;">✓ 应用</button>
+                <button onclick="game.zhouTianConfirmWash(false)" style="flex:1; padding:8px; background:#333; border:none; border-radius:6px; color:#888; font-size:0.75rem; cursor:pointer;">✗ 放弃</button>
+            `;
+        } else {
+            costDisplay.innerText = `消耗: ${cost} 星髓 (当前: ${state.marrow})`;
+            const canWash = state.marrow >= cost;
+            document.getElementById('wash-buttons').innerHTML = `
+                <button onclick="game.zhouTianStartWash(${sIdx})"
+                    style="flex:1; padding:8px; background:${canWash ? '#1e3a8a' : '#333'}; border:none; border-radius:6px; color:${canWash ? '#60a5fa' : '#666'}; font-size:0.75rem; cursor:pointer;"
+                    ${!canWash ? 'disabled' : ''}>
+                    🔮 洗练此域
+                </button>
+            `;
+        }
+    }
+
+    // ZhouTian 交互方法
+    zhouTianStartWash(sectorIdx) {
+        if (this.zhouTian.startWash(sectorIdx)) {
+            this.updateZhouTianModal();
+            this.updateZhouTianUI();
+        }
+    }
+
+    zhouTianConfirmWash(apply) {
+        if (this.zhouTian.confirmWash(apply)) {
+            this.updateZhouTianModal();
+            this.updateZhouTianUI();
+            this.updateStatsUI();
+        }
+    }
+
+    zhouTianToggleLock(globalIdx) {
+        // 切换锁定状态
+        if (this.zhouTian.toggleLock(globalIdx)) {
+            this.updateZhouTianModal();
+            this.updateZhouTianUI();
+        }
+    }
+
+    zhouTianAutoLock() {
+        // 自动锁定所有天品星窍
+        const locked = this.zhouTian.autoLock(5); // 只锁定天品
+        if (locked > 0) {
+            this.zhouTian.addLog(`自动锁定 ${locked} 个天品星窍`);
+        } else {
+            this.zhouTian.addLog('没有可锁定的天品星窍');
+        }
+        this.updateZhouTianModal();
+        this.updateZhouTianUI();
+    }
+
+    zhouTianAutoWash() {
+        // 自动洗练选中的星域或第一个未满的星域
+        const targetSector = this.selectedSectorForWash !== undefined ? this.selectedSectorForWash : 0;
+
+        for (let sIdx = 0; sIdx < 5; sIdx++) {
+            const checkIdx = (targetSector + sIdx) % 5;
+            if (!this.zhouTian.isSectorComplete(checkIdx)) {
+                this.selectedSectorForWash = checkIdx;
+                this.zhouTian.autoWash(checkIdx, 5);
+                this.updateZhouTianModal();
+                this.updateZhouTianUI();
+                this.updateStatsUI();
+                return;
+            }
+        }
+        this.zhouTian.addLog('所有星域已圆满！');
+    }
+
+    zhouTianTriggerBreakthrough() {
+        if (this.zhouTian.triggerBreakthrough()) {
+            this.updateZhouTianModal();
+            this.updateZhouTianUI();
+            this.updateStatsUI();
+        }
+    }
+
+    // ==================== StarBeast Dungeon (星空巨兽副本) ====================
+
+    openStarBeastModal() {
+        this.isStarBeastModalOpen = true;
+        if (this.starBeast) {
+            this.starBeast.openSelectionModal();
+        }
+    }
+
+    closeStarBeastModal() {
+        this.isStarBeastModalOpen = false;
+        if (this.starBeast) {
+            this.starBeast.closeSelectionModal();
+        }
+    }
+
+    closeStarBeastRewardModal() {
+        if (this.starBeast) {
+            this.starBeast.closeRewardModal();
+        }
+    }
+
     // Open/Close Abyss Modal
     openAbyssModal() {
         console.log('openAbyssModal called');

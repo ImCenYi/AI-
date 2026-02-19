@@ -125,9 +125,35 @@ function getRealmInfo(index) {
     };
 }
 
+/**
+ * 计算单次境界突破的倍率（基于跨度）
+ * 公式：1.1 ^ (当前境界所需N - 上一境界所需N)
+ * @param {number} realmIndex - 目标境界索引
+ * @returns {BigNum} 单次突破倍率
+ */
+function getRealmBreakthroughMultiplier(realmIndex) {
+    if (realmIndex <= 0) return new BigNum(1);
+
+    const currentRealm = getRealmInfo(realmIndex);
+    const prevRealm = getRealmInfo(realmIndex - 1);
+
+    const span = currentRealm.requiredDifficulty - prevRealm.requiredDifficulty;
+    return new BigNum(1.1).pow(span);
+}
+
+/**
+ * 计算累计境界加成（所有突破倍率连乘）
+ * @param {number} realmIndex - 当前境界索引
+ * @returns {BigNum} 总境界倍率
+ */
 function getRealmBonus(realmIndex) {
     if (realmIndex <= 0) return new BigNum(1);
-    return new BigNum(1.05).pow(realmIndex);
+
+    let total = new BigNum(1);
+    for (let i = 1; i <= realmIndex; i++) {
+        total = total.mul(getRealmBreakthroughMultiplier(i));
+    }
+    return total;
 }
 
 // Realm Boss Constants
@@ -592,6 +618,79 @@ const ANCIENT_TREASURE_DRAW_RATES = {
 // UR保底次数
 const ANCIENT_TREASURE_PITY = 35;
 
+// ==================== 周天星窍系统配置 ====================
+
+const ZHOUTIAN_SECTORS = [
+    { id: 'qinglong', name: '东方青龙', attr: 'attack', color: '#22c55e', icon: '🐉', desc: '攻击力加成' },
+    { id: 'zhuque', name: '南方朱雀', attr: 'health', color: '#ef4444', icon: '🦅', desc: '生命值加成' },
+    { id: 'baihu', name: '西方白虎', attr: 'equipLevel', color: '#f59e0b', icon: '🐅', desc: '装备等级加成' },
+    { id: 'xuanwu', name: '北方玄武', attr: 'lifeEssence', color: '#3b82f6', icon: '🐢', desc: '生灵精华加成' },
+    { id: 'qilin', name: '中央麒麟', attr: 'allStats', color: '#a855f7', icon: '🦌', desc: '全属性加成' }
+];
+
+// 单个星窍的基础加成值（每提升一个品质等级增加的数值）
+const ZHOUTIAN_BASE_BONUSES = {
+    attack: { type: 'multiply', value: 1.2, suffix: '×', desc: '攻击力' },      // 每个窍×1.2
+    health: { type: 'multiply', value: 1.2, suffix: '×', desc: '生命值' },      // 每个窍×1.2
+    equipLevel: { type: 'add', value: 2, suffix: '', desc: '装备等级' },        // 每个窍+2级
+    lifeEssence: { type: 'multiply', value: 1.15, suffix: '×', desc: '精华获取' }, // 每个窍×1.15
+    allStats: { type: 'multiply', value: 1.1, suffix: '×', desc: '全属性' }     // 每个窍×1.1
+};
+
+const ZHOUTIAN_QUALITIES = [
+    { level: 1, name: '凡', color: '#9ca3af', bg: '#374151', multiplier: 1 },
+    { level: 2, name: '灵', color: '#4ade80', bg: '#14532d', multiplier: 2 },
+    { level: 3, name: '玄', color: '#60a5fa', bg: '#1e3a8a', multiplier: 4 },
+    { level: 4, name: '地', color: '#c084fc', bg: '#581c87', multiplier: 8 },
+    { level: 5, name: '天', color: '#fbbf24', bg: '#92400e', multiplier: 16 }
+];
+
+const ZHOUTIAN_WASH_COSTS = [50, 100, 150, 200, 250];
+
+// ==================== 星空巨兽副本配置 ====================
+// 7个难度，数值压缩逻辑，产出星髓
+// 数值压缩：玩家有效攻击 = (log10(ATK))^2，玩家指数约等于N难度*2
+// 巨兽HP设计：让玩家在10-30回合内击败
+
+const STAR_BEAST_DIFFICULTIES = [
+    // 难度1：N1解锁，对应玩家指数~2，有效攻击~4，巨兽HP=50（约12回合）
+    { level: 1, rank: '先锋', name: '星辉幼兽', icon: '🦌', unlockDifficulty: 1,  hpBase: 50,    atkBase: 5,    marrowBase: 100,  marrowBonus: 20, description: '初入星空的幼年巨兽' },
+
+    // 难度2：N5解锁，对应玩家指数~10，有效攻击~100，巨兽HP=500（约5回合）
+    { level: 2, rank: '统领', name: '虚空掠食者', icon: '🦅', unlockDifficulty: 5,  hpBase: 500,   atkBase: 30,   marrowBase: 300,  marrowBonus: 60, description: '游荡于虚空之间的猎手' },
+
+    // 难度3：N15解锁，对应玩家指数~30，有效攻击~900，巨兽HP=2000（约2回合）
+    { level: 3, rank: '首领', name: '星辰战将', icon: '🦁', unlockDifficulty: 15,  hpBase: 2000,  atkBase: 100,  marrowBase: 800,  marrowBonus: 160, description: '统领星兽军团的首领' },
+
+    // 难度4：N30解锁，对应玩家指数~60，有效攻击~3600，巨兽HP=6000（约2回合）
+    { level: 4, rank: '领主', name: '银河暴君', icon: '🐉', unlockDifficulty: 30,  hpBase: 6000,  atkBase: 250,  marrowBase: 2000, marrowBonus: 400, description: '统治一片星域的霸主' },
+
+    // 难度5：N50解锁，对应玩家指数~100，有效攻击~10000，巨兽HP=15000（约1.5回合）
+    { level: 5, rank: '王者', name: '吞噬星王', icon: '🦈', unlockDifficulty: 50, hpBase: 15000, atkBase: 600,  marrowBase: 5000, marrowBonus: 1000, description: '吞噬星辰的无上王者' },
+
+    // 难度6：N80解锁，对应玩家指数~160，有效攻击~25600，巨兽HP=35000（约1.4回合）
+    { level: 6, rank: '霸主', name: '虚空主宰', icon: '🐙', unlockDifficulty: 80, hpBase: 35000, atkBase: 1400, marrowBase: 12000, marrowBonus: 2400, description: '操控虚空之力的古老存在' },
+
+    // 难度7：N120解锁，对应玩家指数~240，有效攻击~57600，巨兽HP=75000（约1.3回合）
+    { level: 7, rank: '帝君', name: '星空帝尊', icon: '👑', unlockDifficulty: 120, hpBase: 75000, atkBase: 3000, marrowBase: 25000, marrowBonus: 5000, description: '统御星空的至高帝尊' }
+];
+
+// 星空巨兽属性系数（数值压缩后的有效值）
+const STAR_BEAST_STATS = {
+    // 生命值：直接取自配置
+    hpMult: (difficultyLevel) => {
+        const config = STAR_BEAST_DIFFICULTIES.find(d => d.level === difficultyLevel);
+        return config ? config.hpBase : 1000;
+    },
+    // 攻击力：直接取自配置
+    atkMult: (difficultyLevel) => {
+        const config = STAR_BEAST_DIFFICULTIES.find(d => d.level === difficultyLevel);
+        return config ? config.atkBase : 100;
+    },
+    // 奖励系数：击败后获得
+    rewardMult: (difficultyLevel) => difficultyLevel
+};
+
 // Export for module systems if needed
 try {
     if (typeof module !== 'undefined' && module.exports) {
@@ -603,7 +702,9 @@ try {
             DUNGEON_TYPES, DUNGEON_N1_MULT, DUNGEON_ATK_INC, DUNGEON_HP_INC,
             ABYSS_BOSSES, RELIC_QUALITIES, RELIC_ATTR_TYPES, RELIC_BASE_VALUES, ABYSS_RELIC_POOLS,
             ANCIENT_TREASURE_ATTR_TYPES, ANCIENT_TREASURE_UPGRADE_COST,
-            ANCIENT_TREASURE_SYNERGIES, ANCIENT_TREASURE_DRAW_RATES, ANCIENT_TREASURE_PITY
+            ANCIENT_TREASURE_SYNERGIES, ANCIENT_TREASURE_DRAW_RATES, ANCIENT_TREASURE_PITY,
+            ZHOUTIAN_SECTORS, ZHOUTIAN_QUALITIES, ZHOUTIAN_WASH_COSTS, ZHOUTIAN_BASE_BONUSES,
+            STAR_BEAST_DIFFICULTIES, STAR_BEAST_STATS
         };
     }
 } catch (e) {}

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周天星窍养成系统 - 金手指版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @keyframes sector-glow {
+            0% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(34, 211, 238, 0.5); }
+            100% { box-shadow: 0 0 5px rgba(34, 211, 238, 0.2); }
+        }
+        .sector-complete { animation: sector-glow 2s infinite; border-color: #22d3ee !important; background: rgba(8, 47, 73, 0.6) !important; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .preview-mode { border-style: dashed !important; border-color: #fbbf24 !important; }
+        .cheat-btn { transition: all 0.2s; }
+        .cheat-btn:active { transform: scale(0.9); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+    <div id="app" class="max-w-4xl mx-auto space-y-6">
+        <!-- 头部数值区 -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl relative overflow-hidden">
+                <p class="text-slate-400 text-sm font-medium">第 <span id="zhouTianText">1</span> 周天</p>
+                <div class="mt-2 text-3xl font-bold tracking-tighter text-cyan-400" id="multiplierText">×0</div>
+                <p class="text-xs text-slate-500 mt-1">总属性倍率</p>
+            </div>
+
+            <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl col-span-1 md:col-span-3">
+                <div class="flex justify-between items-end mb-3">
+                    <div>
+                        <p class="text-slate-400 text-sm font-medium flex items-center gap-2">
+                            星域圆满进度 (<span id="completeSectorsText">0</span>/5)
+                        </p>
+                        <p class="text-xs text-slate-500">每域 5 窍全满即刻获得属性飞跃</p>
+                    </div>
+                    <div id="sectorDots" class="flex gap-2">
+                        <!-- JS 填充圆满点 -->
+                    </div>
+                </div>
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700">
+                    <div id="progressBar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all duration-700 w-0"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- 左侧：星域矩阵 -->
+            <div class="lg:col-span-8 space-y-6">
+                <div id="sectorContainer" class="space-y-6">
+                    <!-- JS 填充 5 个区块 -->
+                </div>
+            </div>
+
+            <!-- 右侧：控制台 -->
+            <div class="lg:col-span-4 space-y-6">
+                <!-- 资源统计 -->
+                <div class="bg-slate-900 border border-slate-800 p-6 rounded-3xl sticky top-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <div class="group flex items-center gap-2">
+                            <div class="text-yellow-400 font-mono text-2xl font-bold">⭐ <span id="marrowText">10,000</span></div>
+                            <!-- 无限资源注入按钮 -->
+                            <button onclick="cheatMarrow()" class="opacity-0 group-hover:opacity-100 transition-opacity bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded text-[10px] font-bold border border-yellow-500/50 cheat-btn">注入星力</button>
+                        </div>
+                        <span class="text-xs px-2 py-1 bg-slate-800 rounded-lg text-slate-400 border border-slate-700">
+                            已锁: <span id="lockCountText">0</span>/4
+                        </span>
+                    </div>
+
+                    <div class="text-xs text-slate-500 mb-4 bg-slate-800/50 p-3 rounded-xl leading-relaxed">
+                        <i data-lucide="shield-check" class="w-3 h-3 inline mr-1 text-cyan-400"></i>
+                        已激活：单区域 5 窍洗练，锁定上限增至 4，支持资源作弊。
+                    </div>
+
+                    <!-- 矿脉入口 -->
+                    <div id="miningArea">
+                        <button onclick="startMining()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-orange-400 active:scale-95">
+                            <i data-lucide="pickaxe" class="w-5 h-5"></i> 进入星髓矿脉
+                        </button>
+                    </div>
+
+                    <!-- 日志 -->
+                    <div class="mt-6 pt-6 border-t border-slate-800">
+                        <div class="text-[10px] uppercase tracking-widest text-slate-600 font-bold mb-2">修行志</div>
+                        <div id="logs" class="h-40 overflow-y-auto text-[10px] font-mono text-slate-500 space-y-1 pr-2">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 突破特效 -->
+    <div id="breakthroughOverlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-2xl hidden text-center px-4">
+        <div class="relative">
+            <i data-lucide="milestone" class="w-32 h-32 text-cyan-400 animate-pulse"></i>
+            <div class="absolute inset-0 bg-cyan-500 blur-3xl opacity-20 animate-ping"></div>
+        </div>
+        <h2 class="text-5xl md:text-6xl font-black italic text-transparent bg-clip-text bg-gradient-to-b from-white to-cyan-500 mt-8">周天大圆满</h2>
+        <p class="text-cyan-200/60 mt-4 tracking-[0.3em] uppercase">星域重塑 · 功力翻倍</p>
+    </div>
+
+    <script>
+        // --- 核心配置 ---
+        const SECTORS = [
+            { name: "东方青龙", id: "east", color: "emerald" },
+            { name: "南方朱雀", id: "south", color: "rose" },
+            { name: "西方白虎", id: "west", color: "slate" },
+            { name: "北方玄武", id: "north", color: "indigo" },
+            { name: "中央麒麟", id: "center", color: "amber" }
+        ];
+
+        const QUALITIES = [
+            { level: 1, name: '凡', color: 'text-slate-500', bg: 'bg-slate-800', border: 'border-slate-700', multiplier: 1 },
+            { level: 2, name: '灵', color: 'text-green-400', bg: 'bg-green-950/20', border: 'border-green-900/50', multiplier: 5 },
+            { level: 3, name: '玄', color: 'text-blue-400', bg: 'bg-blue-950/20', border: 'border-blue-900/50', multiplier: 25 },
+            { level: 4, name: '地', color: 'text-purple-400', bg: 'bg-purple-950/20', border: 'border-purple-900/50', multiplier: 125 },
+            { level: 5, name: '天', color: 'text-cyan-400', bg: 'bg-cyan-950/30', border: 'border-cyan-400', shadow: 'shadow-[0_0_10px_rgba(34,211,238,0.3)]', multiplier: 1000 }
+        ];
+
+        // --- 应用状态 ---
+        let state = {
+            zhouTian: 1,
+            marrow: 10000,
+            acupoints: Array(25).fill(1), // 5星域 * 每域5窍
+            locks: [],
+            previewSectorIdx: null,
+            previewData: null,
+            isMining: false,
+            mineFloor: 0,
+            mineReward: 0
+        };
+
+        // --- 初始化 ---
+        function init() {
+            renderSectors();
+            updateUI();
+            addLog("归元合一，金手指已开启，请随意洗练。");
+        }
+
+        // --- 金手指：一键注入资源 ---
+        function cheatMarrow() {
+            state.marrow += 1000000;
+            addLog("【金手指】星力灌顶，注入 1,000,000 星髓。");
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('zhouTianText').innerText = state.zhouTian;
+            document.getElementById('marrowText').innerText = state.marrow.toLocaleString();
+            document.getElementById('lockCountText').innerText = state.locks.length;
+
+            let completeCount = 0;
+            const sectorDots = document.getElementById('sectorDots');
+            sectorDots.innerHTML = '';
+
+            SECTORS.forEach((s, i) => {
+                const sectorPoints = state.acupoints.slice(i * 5, (i + 1) * 5);
+                const isComplete = sectorPoints.every(q => q === 5);
+                if (isComplete) completeCount++;
+                
+                const dot = document.createElement('div');
+                dot.className = `w-4 h-4 rounded-full border-2 border-slate-700 ${isComplete ? 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)] border-cyan-300' : 'bg-slate-800'}`;
+                sectorDots.appendChild(dot);
+                
+                const sectorEl = document.getElementById(`sector-${i}`);
+                if (sectorEl) {
+                    if (isComplete) sectorEl.classList.add('sector-complete');
+                    else sectorEl.classList.remove('sector-complete');
+                }
+            });
+
+            document.getElementById('completeSectorsText').innerText = completeCount;
+            document.getElementById('progressBar').style.width = (completeCount / 5 * 100) + '%';
+            
+            const baseMult = Math.pow(2, state.zhouTian - 1);
+            const sum = state.acupoints.reduce((acc, q) => acc + QUALITIES[q-1].multiplier, 0);
+            document.getElementById('multiplierText').innerText = '×' + (baseMult * sum).toLocaleString();
+
+            lucide.createIcons();
+        }
+
+        function renderSectors() {
+            const container = document.getElementById('sectorContainer');
+            container.innerHTML = '';
+
+            SECTORS.forEach((s, sIdx) => {
+                const sectorDiv = document.createElement('div');
+                sectorDiv.id = `sector-${sIdx}`;
+                sectorDiv.className = `bg-slate-900 border border-slate-800 p-5 rounded-3xl transition-all duration-500 overflow-hidden relative`;
+                
+                let actionHtml = '';
+                if (state.previewSectorIdx === sIdx) {
+                    actionHtml = `
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <button onclick="confirmEnlighten(true)" class="flex-1 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 rounded-xl text-xs font-bold transition-all">吸纳感悟</button>
+                            <button onclick="confirmEnlighten(false)" class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-xl text-xs font-bold transition-all">放弃</button>
+                        </div>
+                    `;
+                } else {
+                    const sectorLocks = state.locks.filter(idx => idx >= sIdx*5 && idx < (sIdx+1)*5);
+                    const cost = 100 + sectorLocks.length * 200;
+                    const isDisabled = state.previewSectorIdx !== null;
+                    actionHtml = `
+                        <button onclick="enlighten(${sIdx})" ${isDisabled ? 'disabled' : ''} class="w-full md:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'text-cyan-400'}">
+                            <i data-lucide="refresh-cw" class="w-3 h-3"></i> 区域洗练 (${cost})
+                        </button>
+                    `;
+                }
+
+                sectorDiv.innerHTML = `
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-1 h-6 bg-${s.color}-500 rounded-full"></div>
+                            <h4 class="font-bold tracking-widest text-slate-300 uppercase">${s.name}</h4>
+                        </div>
+                        ${actionHtml}
+                    </div>
+                    <div class="grid grid-cols-5 gap-3" id="grid-${sIdx}"></div>
+                `;
+                container.appendChild(sectorDiv);
+                
+                const grid = document.getElementById(`grid-${sIdx}`);
+                for (let i = 0; i < 5; i++) {
+                    const currentIdx = sIdx * 5 + i;
+                    const isPreviewingThisSector = state.previewSectorIdx === sIdx;
+                    const qLevel = isPreviewingThisSector ? state.previewData[i] : state.acupoints[currentIdx];
+                    const q = QUALITIES[qLevel - 1];
+                    const isLocked = state.locks.includes(currentIdx);
+                    
+                    const btn = document.createElement('button');
+                    btn.className = `relative h-16 flex flex-col items-center justify-center rounded-2xl border transition-all ${q.bg} ${q.border} ${isLocked ? 'ring-2 ring-cyan-400 ring-offset-2 ring-offset-slate-900' : 'hover:border-slate-500'} ${q.shadow || ''} ${isPreviewingThisSector ? 'preview-mode' : ''}`;
+                    btn.innerHTML = `<span class="text-lg font-black ${q.color}">${q.name}</span>`;
+                    
+                    if (isLocked) {
+                        btn.innerHTML += `<div class="absolute -top-1 -right-1 bg-cyan-400 text-slate-950 rounded-full p-1"><i data-lucide="lock" class="w-2.5 h-2.5"></i></div>`;
+                    }
+                    
+                    btn.onclick = () => toggleLock(currentIdx);
+                    if (state.previewSectorIdx !== null && !isPreviewingThisSector) btn.disabled = true;
+                    grid.appendChild(btn);
+                }
+            });
+            lucide.createIcons();
+        }
+
+        function toggleLock(i) {
+            if (state.previewSectorIdx !== null) return;
+            if (state.locks.includes(i)) {
+                state.locks = state.locks.filter(idx => idx !== i);
+            } else if (state.locks.length < 4) { // 修改锁定上限为 4
+                state.locks.push(i);
+            } else {
+                addLog("注意：天道限制，最多同时锁定 4 个星窍。");
+            }
+            renderSectors();
+            updateUI();
+        }
+
+        function enlighten(sIdx) {
+            const sectorLocks = state.locks.filter(idx => idx >= sIdx*5 && idx < (sIdx+1)*5);
+            const cost = 100 + sectorLocks.length * 200;
+            
+            if (state.marrow < cost) return alert("星髓不足，请点击右侧金手指注入资源！");
+
+            state.marrow -= cost;
+            state.previewSectorIdx = sIdx;
+            
+            // 局部预览数据生成
+            state.previewData = [];
+            for(let i=0; i<5; i++) {
+                const globalIdx = sIdx * 5 + i;
+                if (state.locks.includes(globalIdx)) {
+                    state.previewData.push(state.acupoints[globalIdx]);
+                } else {
+                    state.previewData.push(Math.floor(Math.random() * 5) + 1);
+                }
+            }
+
+            renderSectors();
+            updateUI();
+        }
+
+        function confirmEnlighten(apply) {
+            if (apply) {
+                const sIdx = state.previewSectorIdx;
+                for(let i=0; i<5; i++) {
+                    state.acupoints[sIdx * 5 + i] = state.previewData[i];
+                }
+                addLog(`${SECTORS[sIdx].name}洗练完毕。`);
+                checkBreakthrough();
+            }
+            state.previewSectorIdx = null;
+            state.previewData = null;
+            renderSectors();
+            updateUI();
+        }
+
+        function checkBreakthrough() {
+            const allComplete = state.acupoints.every(q => q === 5);
+            if (allComplete) {
+                document.getElementById('breakthroughOverlay').classList.remove('hidden');
+                setTimeout(() => {
+                    state.zhouTian++;
+                    state.acupoints.fill(1); // 晋升下一周天重置
+                    state.locks = [];
+                    document.getElementById('breakthroughOverlay').classList.add('hidden');
+                    updateUI();
+                    renderSectors();
+                    addLog(`震古烁今！你已达成第 ${state.zhouTian} 周天圆满！`);
+                }, 3000);
+            }
+        }
+
+        // --- 矿脉挖矿逻辑 ---
+        function startMining() {
+            state.isMining = true;
+            state.mineFloor = 1;
+            state.mineReward = 500;
+            renderMining();
+        }
+
+        function diveDeeper() {
+            const failChance = 0.12 + (state.mineFloor * 0.02);
+            if (Math.random() < failChance) {
+                const salvaged = Math.floor(state.mineReward * 0.4);
+                state.marrow += salvaged;
+                addLog(`矿脉坍塌！险之又险地抢回了 ${salvaged} 星髓。`);
+                state.isMining = false;
+            } else {
+                state.mineFloor++;
+                state.mineReward += 500 + (state.mineFloor * 100);
+            }
+            renderMining();
+            updateUI();
+        }
+
+        function retreatMining() {
+            state.marrow += state.mineReward;
+            addLog(`见好就收，从矿脉中带回了 ${state.mineReward} 星髓。`);
+            state.isMining = false;
+            renderMining();
+            updateUI();
+        }
+
+        function renderMining() {
+            const area = document.getElementById('miningArea');
+            if (!state.isMining) {
+                area.innerHTML = `<button onclick="startMining()" class="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 py-4 rounded-2xl font-bold transition-all flex items-center justify-center gap-2 text-orange-400 active:scale-95"><i data-lucide="pickaxe" class="w-5 h-5"></i> 进入星髓矿脉</button>`;
+            } else {
+                area.innerHTML = `
+                    <div class="bg-orange-950/20 border border-orange-900/50 p-5 rounded-2xl space-y-4 animate-in slide-in-from-bottom-2 duration-300">
+                        <div class="flex justify-between items-center text-[10px] font-bold tracking-widest text-orange-500">
+                            <span>探测矿脉中</span>
+                            <span class="font-mono">DEPTH ${state.mineFloor}F</span>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-3xl font-black text-white">${state.mineReward}</div>
+                            <div class="text-[10px] text-slate-500 mt-1 uppercase tracking-tighter">当前累计星髓</div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="diveDeeper()" class="flex-1 bg-orange-700 hover:bg-orange-600 py-3 rounded-xl text-xs font-bold transition-colors shadow-lg shadow-orange-900/40">深入下层</button>
+                            <button onclick="retreatMining()" class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl text-xs font-bold transition-colors">全额撤出</button>
+                        </div>
+                    </div>
+                `;
+            }
+            lucide.createIcons();
+        }
+
+        function addLog(msg) {
+            const logs = document.getElementById('logs');
+            const div = document.createElement('div');
+            div.className = "border-l-2 border-slate-800 pl-2 py-1.5 fade-in";
+            div.innerHTML = `<span class="text-slate-700 mr-2">${new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span> ${msg}`;
+            logs.prepend(div);
+            if (logs.children.length > 20) logs.lastChild.remove();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

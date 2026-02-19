@@ -186,6 +186,8 @@
             <button class="tab-btn" onclick="game.switchTab('realm')">✨ 境界突破</button>
 <button class="tab-btn" onclick="game.switchTab('garden')">🌿 百草灵园</button>
             <button class="tab-btn" onclick="game.switchTab('ancient-treasure')">📜 大千宝录</button>
+            <button class="tab-btn" onclick="game.switchTab('zhou-tian')">⭐ 周天星窍</button>
+            <button class="tab-btn" onclick="game.openStarBeastModal()">🌟 星空巨兽</button>
             <button class="tab-btn" onclick="game.switchTab('abyss')">🌑 深渊遗宝</button>
         </div>
 
@@ -270,13 +272,15 @@
                 <div class="sub-stat">境界加成: <span id="realm-bonus" class="val">x1.00</span> (全属性)</div>
                 <div class="sub-stat">下一境界: <span id="next-realm" class="val">练气-初期</span></div>
                 <div class="sub-stat">突破需求: 历史最高难度达到 <span id="realm-req" class="val highlight">N4</span></div>
+                <div class="sub-stat">突破跨度: <span id="realm-span" class="val highlight" style="color:#f59e0b;">跨越 3 层</span></div>
+                <div class="sub-stat">突破倍率: <span id="realm-multiplier" class="val highlight" style="color:#ef4444;">x1.33</span></div>
                 <div class="sub-stat">当前进度: <span id="realm-progress" class="val">1/4 (25%)</span></div>
-                
+
                 <button class="sys-btn btn-realm" id="btn-realm-challenge" onclick="game.summonRealmBoss()" disabled>🔒 难度不足</button>
                 <div style="font-size:0.7rem; color:#888; margin-top:5px;">
                     * 达到指定难度后可挑战境界天劫<br>
                     * 击败天劫BOSS即可突破境界<br>
-                    * 突破后获得全属性加成
+                    * <b style="color:#f59e0b;">突破跨度越大，获得的加成越丰厚！</b>
                 </div>
             </div>
         </div>
@@ -396,6 +400,65 @@
                     * 收集各界古宝，获得巨大加成<br>
                     * 古宝品质越高，成长率越高<br>
                     * 使用寻宝令进行天命寻宝 (UR保底40抽)
+                </div>
+            </div>
+        </div>
+
+        <!-- ZhouTian Star Acupoint Tab (周天星窍) -->
+        <div id="tab-zhou-tian" class="tab-content">
+            <div class="system-section">
+                <div class="res-display" style="border:none; color:#fbbf24;">⭐ 周天星窍</div>
+
+                <!-- 周天等级和指数加成 -->
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom:10px;">
+                    <div style="background:#1a1a1a; padding:8px; border-radius:6px; text-align:center;">
+                        <div style="font-size:0.7rem; color:#888;">当前周天</div>
+                        <div id="zhou-tian-level" style="font-size:1.3rem; font-weight:bold; color:#fbbf24;">第1周天</div>
+                    </div>
+                    <div style="background:#1a1a1a; padding:8px; border-radius:6px; text-align:center;">
+                        <div style="font-size:0.7rem; color:#888;">指数加成</div>
+                        <div id="zhou-tian-exp-bonus" style="font-size:1.3rem; font-weight:bold; color:#a855f7;">+0.0%</div>
+                    </div>
+                </div>
+
+                <!-- 圆满进度 -->
+                <div style="background:#1a1a1a; padding:10px; border-radius:6px; margin-bottom:10px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8rem; margin-bottom:5px;">
+                        <span style="color:#888;">星域圆满进度</span>
+                        <span id="zhou-tian-complete-count" style="color:#22c55e; font-weight:bold;">0/5</span>
+                    </div>
+                    <div style="height:6px; background:#333; border-radius:3px; overflow:hidden;">
+                        <div id="zhou-tian-progress" style="width:0%; height:100%; background:linear-gradient(90deg, #fbbf24, #f59e0b); transition:width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <!-- 属性加成预览 -->
+                <div style="background:#1a1a1a; padding:10px; border-radius:6px; margin-bottom:10px; font-size:0.75rem;">
+                    <div style="color:#888; margin-bottom:5px;">属性加成</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                        <div>🐉 攻击: <span id="zhou-tian-atk" class="val" style="color:#22c55e;">×1</span></div>
+                        <div>🦅 生命: <span id="zhou-tian-hp" class="val" style="color:#ef4444;">×1</span></div>
+                        <div>🐅 装备: <span id="zhou-tian-equip" class="val" style="color:#f59e0b;">+0</span></div>
+                        <div>🐢 精华: <span id="zhou-tian-essence" class="val" style="color:#3b82f6;">×1</span></div>
+                        <div style="grid-column:span 2;">🦌 全属: <span id="zhou-tian-all" class="val" style="color:#a855f7;">×1</span></div>
+                    </div>
+                </div>
+
+                <!-- 星髓数量 -->
+                <div style="display:flex; justify-content:space-between; align-items:center; background:linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%); padding:10px; border-radius:6px; border:1px solid #333; margin-bottom:10px;">
+                    <span style="font-size:0.8rem; color:#888;">💎 星髓</span>
+                    <span id="zhou-tian-marrow-count" style="font-size:1.1rem; font-weight:bold; color:#fbbf24;">1000</span>
+                </div>
+
+                <!-- 进入按钮 -->
+                <button class="sys-btn" onclick="game.openZhouTianModal()" style="background:linear-gradient(to right, #d97706, #fbbf24); color:#000; font-weight:bold;">
+                    ⭐ 进入星窍洗练
+                </button>
+
+                <div style="font-size:0.7rem; color:#888; margin-top:5px;">
+                    * 洗练星窍获得属性加成<br>
+                    * 25窍全满可进入下一周天<br>
+                    * 每周天+0.1%指数加成
                 </div>
             </div>
         </div>
@@ -767,10 +830,14 @@
             
             <!-- 境界加成 -->
             <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
-                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">✨ 境界加成</div>
+                <div style="color: #888; font-size: 0.85rem; margin-bottom: 8px;">✨ 境界加成 (跨度奖励)</div>
                 <div style="font-size: 0.8rem;">
                     <div>当前境界: <span id="detail-realm-name" class="val" style="color:#c084fc">-</span></div>
                     <div>境界倍率: <span id="detail-realm-bonus" class="val" style="color:#fbbf24">-</span></div>
+                    <div>突破次数: <span id="detail-realm-count" class="val">-</span></div>
+                    <div style="color:#888; font-size:0.75rem; margin-top:4px;">
+                        * 每次突破获得 x1.1^(跨度) 倍率
+                    </div>
                 </div>
             </div>
             
@@ -837,6 +904,219 @@
         </div>
         
         <button class="modal-btn btn-close" onclick="game.closeModal('stats-detail-modal')" style="margin-top: 15px;">关闭</button>
+    </div>
+</div>
+
+<!-- ZhouTian System Modal (周天星窍系统 - 星座图版) -->
+<div id="zhou-tian-modal" class="game-modal" style="z-index: 1600;">
+    <div class="modal-content" style="width: 95%; max-width: 1000px; height: 90%; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+        <!-- 头部 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding:15px 20px; background:linear-gradient(135deg, #0f172a 0%, #1e293b 100%);">
+            <div>
+                <h2 style="margin:0; color:#fbbf24; font-size:1.3rem; letter-spacing:0.2em;">⭐ 周天星窍</h2>
+                <div style="font-size:0.7rem; color:#64748b; margin-top:3px;">洗练星窍，突破周天</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(251,191,36,0.1); border-radius:20px; border:1px solid rgba(251,191,36,0.3);">
+                    <span style="font-size:0.75rem; color:#fbbf24;">💎 星髓:</span>
+                    <span id="zhou-tian-modal-marrow" style="font-size:0.9rem; font-weight:bold; color:#fbbf24;">0</span>
+                </div>
+                <button class="modal-btn btn-close" style="width:auto; margin:0; padding:5px 12px;" onclick="game.closeZhouTianModal()">✕</button>
+            </div>
+        </div>
+
+        <!-- 主体内容 -->
+        <div style="display:flex; flex:1; overflow:hidden;">
+            <!-- 左侧：星座图 -->
+            <div style="flex:1; background:radial-gradient(circle at center, #0f172a 0%, #0a0a0a 100%); padding:15px; overflow-y:auto; position:relative;">
+                <!-- 星座图容器 -->
+                <div id="zhou-tian-constellation" style="position:relative; width:100%; height:500px; min-height:500px;">
+                    <!-- 连接线 SVG -->
+                    <svg id="constellation-lines" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:1;">
+                        <!-- 由JS生成连接线 -->
+                    </svg>
+                    <!-- 星窍点位 -->
+                    <div id="constellation-points" style="position:absolute; inset:0; z-index:2;">
+                        <!-- 由JS生成25个星窍 -->
+                    </div>
+                    <!-- 星域标签 -->
+                    <div id="constellation-labels" style="position:absolute; inset:0; z-index:3; pointer-events:none;">
+                        <!-- 由JS生成5个星域标签 -->
+                    </div>
+                </div>
+
+                <!-- 选中的星窍详情 -->
+                <div id="acupoint-detail" style="background:#1a1a1a; border:1px solid #333; border-radius:8px; padding:12px; margin-top:10px; display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span id="detail-sector-name" style="font-weight:bold; color:#fbbf24;">--</span>
+                        <span id="detail-quality" style="font-size:0.8rem; padding:2px 8px; border-radius:4px;">--</span>
+                    </div>
+                    <div style="font-size:0.75rem; color:#888; margin-bottom:5px;">当前加成</div>
+                    <div id="detail-bonus" style="font-size:1.1rem; font-weight:bold; color:#22c55e; margin-bottom:8px;">--</div>
+                    <div style="font-size:0.7rem; color:#64748b;">
+                        下一级: <span id="detail-next-bonus" style="color:#fbbf24;">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：控制台 -->
+            <div style="width:280px; background:#0f0f0f; border-left:1px solid #222; display:flex; flex-direction:column; padding:15px;">
+                <!-- 周天信息 -->
+                <div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-size:0.75rem; color:#888;">当前周天</span>
+                        <span id="zhou-tian-modal-level" style="font-size:0.9rem; font-weight:bold; color:#fbbf24;">第1周天</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+                        <span style="font-size:0.75rem; color:#888;">指数加成</span>
+                        <span id="zhou-tian-modal-exp" style="font-size:0.9rem; font-weight:bold; color:#a855f7;">+0.0%</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between;">
+                        <span style="font-size:0.75rem; color:#888;">已锁定</span>
+                        <span id="zhou-tian-modal-locks" style="font-size:0.9rem; font-weight:bold; color:#22c55e;">0/4</span>
+                    </div>
+                </div>
+
+                <!-- 各星域加成 -->
+                <div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:12px; font-size:0.75rem;">
+                    <div style="color:#888; margin-bottom:8px; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.1em;">各星域加成</div>
+
+                    <!-- 青龙 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding:6px; background:#0f1f0f; border-radius:4px;">
+                        <span style="color:#22c55e;">🐉 青龙 <span id="modal-locks-0" style="font-size:0.65rem; opacity:0.8;">🔒0/4</span></span>
+                        <span id="modal-bonus-attack" style="color:#22c55e; font-weight:bold;">×1</span>
+                    </div>
+                    <!-- 朱雀 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding:6px; background:#1f0f0f; border-radius:4px;">
+                        <span style="color:#ef4444;">🦅 朱雀 <span id="modal-locks-1" style="font-size:0.65rem; opacity:0.8;">🔒0/4</span></span>
+                        <span id="modal-bonus-health" style="color:#ef4444; font-weight:bold;">×1</span>
+                    </div>
+                    <!-- 白虎 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding:6px; background:#1f1a0f; border-radius:4px;">
+                        <span style="color:#f59e0b;">🐅 白虎 <span id="modal-locks-2" style="font-size:0.65rem; opacity:0.8;">🔒0/4</span></span>
+                        <span id="modal-bonus-equip" style="color:#f59e0b; font-weight:bold;">+0</span>
+                    </div>
+                    <!-- 玄武 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; padding:6px; background:#0f1a2f; border-radius:4px;">
+                        <span style="color:#3b82f6;">🐢 玄武 <span id="modal-locks-3" style="font-size:0.65rem; opacity:0.8;">🔒0/4</span></span>
+                        <span id="modal-bonus-essence" style="color:#3b82f6; font-weight:bold;">×1</span>
+                    </div>
+                    <!-- 麒麟 -->
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px; background:#1a0f2f; border-radius:4px;">
+                        <span style="color:#a855f7;">🦌 麒麟 <span id="modal-locks-4" style="font-size:0.65rem; opacity:0.8;">🔒0/4</span></span>
+                        <span id="modal-bonus-all" style="color:#a855f7; font-weight:bold;">×1</span>
+                    </div>
+                </div>
+
+                <!-- 突破按钮（可突破时显示） -->
+                <div id="breakthrough-panel" style="background:linear-gradient(135deg, #1a0f2f, #2d1f3f); padding:12px; border-radius:8px; margin-bottom:12px; display:none; border:1px solid #a855f7;">
+                    <div style="text-align:center; margin-bottom:8px;">
+                        <span style="font-size:0.9rem; font-weight:bold; color:#fbbf24;">✨ 周天圆满</span>
+                    </div>
+                    <div style="font-size:0.7rem; color:#888; text-align:center; margin-bottom:8px;">
+                        所有星窍已达天品<br>
+                        可突破进入下一周天
+                    </div>
+                    <button onclick="game.zhouTianTriggerBreakthrough()" style="width:100%; padding:10px; background:linear-gradient(135deg, #a855f7, #7c3aed); border:none; border-radius:6px; color:white; font-size:0.8rem; font-weight:bold; cursor:pointer;">
+                        🚀 突破周天
+                    </button>
+                </div>
+
+                <!-- 当前选中星域洗练 -->
+                <div id="sector-wash-panel" style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:12px; display:none;">
+                    <div id="wash-sector-name" style="font-weight:bold; color:#fbbf24; margin-bottom:8px;">--</div>
+                    <div id="wash-cost-display" style="font-size:0.7rem; color:#888; margin-bottom:8px;">消耗: 50 星髓</div>
+                    <div id="wash-buttons" style="display:flex; gap:5px;">
+                        <button id="btn-start-wash" style="flex:1; padding:8px; background:#1e3a8a; border:none; border-radius:6px; color:#60a5fa; font-size:0.75rem; cursor:pointer;">
+                            洗练
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 快捷操作 -->
+                <div style="background:#1a1a1a; padding:12px; border-radius:8px; margin-bottom:12px;">
+                    <div style="color:#888; margin-bottom:8px; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.1em;">快捷操作</div>
+                    <button onclick="game.zhouTianAutoLock()" style="width:100%; padding:8px; background:#1e3a8a; border:none; border-radius:6px; color:#60a5fa; font-size:0.75rem; cursor:pointer; margin-bottom:6px;">
+                        🔒 自动锁定天品
+                    </button>
+                    <button onclick="game.zhouTianAutoWash()" style="width:100%; padding:8px; background:#14532d; border:none; border-radius:6px; color:#4ade80; font-size:0.75rem; cursor:pointer;">
+                        ⚡ 自动洗练至全满
+                    </button>
+                </div>
+
+                <!-- 日志 -->
+                <div style="flex:1; background:#0a0a0a; border-radius:8px; padding:10px; overflow-y:auto; font-size:0.7rem;">
+                    <div style="color:#475569; margin-bottom:5px; font-size:0.65rem; text-transform:uppercase; letter-spacing:0.1em;">修行志</div>
+                    <div id="zhou-tian-logs" style="display:flex; flex-direction:column; gap:4px;">
+                        <!-- 由JS填充 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- StarBeast Dungeon Modal (星空巨兽副本) -->
+<div id="starbeast-modal" class="game-modal" style="z-index: 1600;">
+    <div class="modal-content" style="width: 95%; max-width: 600px; height: 85%; display: flex; flex-direction: column; padding: 0; overflow: hidden;">
+        <!-- 头部 -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #333; padding:15px 20px; background:linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 100%);">
+            <div>
+                <h2 style="margin:0; color:#a855f7; font-size:1.3rem; letter-spacing:0.2em;">🌟 星空巨兽</h2>
+                <div style="font-size:0.7rem; color:#64748b; margin-top:3px;">挑战巨兽，获取星髓</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:15px;">
+                <div style="display:flex; align-items:center; gap:8px; padding:6px 12px; background:rgba(168,85,247,0.1); border-radius:20px; border:1px solid rgba(168,85,247,0.3);">
+                    <span style="font-size:0.75rem; color:#a855f7;">💎 星髓:</span>
+                    <span id="starbeast-total-marrow" style="font-size:0.9rem; font-weight:bold; color:#fbbf24;">0</span>
+                </div>
+                <button class="modal-btn btn-close" style="width:auto; margin:0; padding:5px 12px;" onclick="game.closeStarBeastModal()">✕</button>
+            </div>
+        </div>
+
+        <!-- 主体内容 -->
+        <div style="flex:1; background:#0a0a0f; padding:20px; overflow-y:auto;">
+            <!-- 今日挑战次数 -->
+            <div style="background:#1a1a2e; border:1px solid #2a2a3e; border-radius:8px; padding:12px; margin-bottom:20px; text-align:center;">
+                <span style="font-size:0.75rem; color:#888;">今日剩余挑战:</span>
+                <span id="starbeast-attempts" style="font-size:1rem; font-weight:bold; color:#a855f7; margin-left:8px;">10/10</span>
+            </div>
+
+            <!-- 难度列表 -->
+            <div style="margin-bottom:15px;">
+                <div style="font-size:0.8rem; color:#888; margin-bottom:12px; text-transform:uppercase; letter-spacing:0.1em;">选择难度</div>
+                <div id="starbeast-difficulty-list" style="display:flex; flex-direction:column; gap:8px;">
+                    <!-- 由JS生成 -->
+                </div>
+            </div>
+
+            <!-- 说明 -->
+            <div style="background:#0f0f1a; border-radius:8px; padding:12px; font-size:0.7rem; color:#64748b;">
+                <div style="margin-bottom:6px;">📜 战斗规则:</div>
+                <div style="margin-left:12px; line-height:1.6;">
+                    • 数值压缩战斗：玩家攻击/生命按对数压缩<br>
+                    • 每日可挑战10次，次数每日0点重置<br>
+                    • 难度越高，星髓奖励越丰厚
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- StarBeast Reward Modal (星空巨兽奖励) -->
+<div id="starbeast-reward-modal" class="game-modal" style="z-index: 1700;">
+    <div class="modal-content" style="width: 300px; padding: 30px; text-align: center; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f1a 100%); border: 1px solid #a855f7;">
+        <div style="font-size: 3rem; margin-bottom: 15px;">🎉</div>
+        <h3 style="color: #fbbf24; margin: 0 0 15px 0;">挑战成功!</h3>
+        <div style="color: #888; font-size: 0.85rem; margin-bottom: 20px;">
+            击败星空巨兽，获得星髓
+        </div>
+        <div style="font-size: 1.5rem; font-weight: bold; color: #a855f7; margin-bottom: 20px;">
+            +<span id="starbeast-reward-amount">0</span> 💎
+        </div>
+        <button onclick="game.closeStarBeastRewardModal()" style="padding: 10px 30px; background: linear-gradient(135deg, #a855f7, #7c3aed); border: none; border-radius: 6px; color: white; font-size: 0.9rem; cursor: pointer;">
+            确定
+        </button>
     </div>
 </div>
 
@@ -1030,6 +1310,7 @@
             <option value="gardenEssence">生灵精华倍率</option>
             <option value="abyssFrag">深渊遗宝碎片</option>
             <option value="treasureToken">古宝寻宝令</option>
+            <option value="zhouTianMarrow">周天星髓</option>
             <option value="currentDiff">当前主线难度</option>
         </select>
         <input type="text" id="cheat-val" class="cheat-input" placeholder="输入数值 (支持 1e100)">
@@ -1049,6 +1330,8 @@
 <script src="js/classes/LifeEssenceRefinement.js"></script>
 <script src="js/classes/SpiritGarden.js"></script>
 <script src="js/classes/AncientTreasure.js"></script>
+<script src="js/classes/ZhouTianSystem.js"></script>
+<script src="js/classes/StarBeastDungeon.js"></script>
 <script src="js/classes/AbyssRelic.js"></script>
 <script src="js/classes/AbyssDungeon.js"></script>
 <script src="js/game/Game.js"></script>
