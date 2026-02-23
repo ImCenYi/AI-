@@ -83,6 +83,13 @@ class Game {
         this.starBeast = new StarBeastDungeon(this);
         this.isStarBeastModalOpen = false;
 
+        // Technique System (功法系统)
+        this.technique = new Technique(this);
+        this.isTechniqueTabActive = false;
+
+        // 灵石资源
+        this.stones = new BigNum(0);
+
         this.isDead = false;
         this.lastTick = Date.now();
         this.autoChallenge = false;
@@ -112,6 +119,7 @@ class Game {
         this.updateZhouTianUI();
         this.dungeon.updateUI();
         if (this.starBeast) this.starBeast.updateUI();
+        if (this.technique) this.technique.updateUI();
     }
 
     getIcon(slot) {
@@ -211,6 +219,22 @@ class Game {
             if (this.zhouTianExponentBonus > 0) {
                 stats.atk = stats.atk.expBonus(this.zhouTianExponentBonus);
                 maxHp = maxHp.expBonus(this.zhouTianExponentBonus);
+            }
+        }
+
+        // Apply Technique System bonus (功法系统加成)
+        // 新规则: 7个功法提供不同属性加成
+        if (this.technique) {
+            const techBonuses = this.technique.getAllBonuses();
+
+            // 攻击加成 (功法1 + 功法6)
+            if (techBonuses.atkMult > 1) {
+                stats.atk = stats.atk.mul(techBonuses.atkMult);
+            }
+
+            // 生命加成 (功法2 + 功法7)
+            if (techBonuses.hpMult > 1) {
+                maxHp = maxHp.mul(techBonuses.hpMult);
             }
         }
 
@@ -380,23 +404,25 @@ class Game {
     switchTab(tab) {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        const btnIdx = ['law','dungeon','realm','garden','ancient-treasure','zhou-tian','abyss'].indexOf(tab);
-        document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
+        // 注意：第7个按钮是"星空巨兽"，它调用openStarBeastModal而不是switchTab，所以数组中需要留占位
+        const btnIdx = ['law','dungeon','realm','garden','ancient-treasure','zhou-tian',null,'abyss','technique'].indexOf(tab);
+        if (btnIdx >= 0) document.querySelectorAll('.tab-btn')[btnIdx].classList.add('active');
         document.getElementById(`tab-${tab}`).classList.add('active');
-        
+
         // Update flags
         this.isGardenTabActive = (tab === 'garden');
-        
+        this.isTechniqueTabActive = (tab === 'technique');
+
         // Update realm UI when switching to realm tab
         if (tab === 'realm') {
             this.updateRealmUI();
         }
-        
+
         // Update garden overview when switching to garden tab
         if (tab === 'garden') {
             this.updateGardenOverview();
         }
-        
+
         // Update abyss overview when switching to abyss tab
         if (tab === 'abyss') {
             this.updateAbyssOverview();
@@ -410,6 +436,11 @@ class Game {
         // Update ZhouTian overview when switching to zhou-tian tab
         if (tab === 'zhou-tian') {
             this.updateZhouTianUI();
+        }
+
+        // Update technique overview when switching to technique tab
+        if (tab === 'technique') {
+            this.technique.updateUI();
         }
     }
 
@@ -664,6 +695,20 @@ class Game {
             }
         }
 
+        // 灵石掉落（功法系统）- 只有主线敌人掉落
+        if (this.technique && this.mode === 'wild') {
+            const stoneDrop = this.calculateStoneDrop(enemy);
+            if (stoneDrop.gt(0)) {
+                this.stones = this.stones.add(stoneDrop);
+                // 显示灵石跳字
+                this.showStoneDrop(stoneDrop, enemy.id);
+                // 灵石袋或BOSS时显示日志
+                if (enemy.isBoss || stoneDrop.gte(1000)) {
+                    this.log('GAIN', `💎 获得 ${formatNum(stoneDrop)} 灵石${stoneDrop.gte(1000) ? ' (灵石袋!)' : ''}`);
+                }
+            }
+        }
+
         if (this.mode === 'tower') {
             if (enemy.isBoss) {
                 this.towerLevel++;
@@ -702,6 +747,44 @@ class Game {
                 this.rollWildLoot(false);
             }
         }
+    }
+
+    /**
+     * 计算灵石掉落 - 新规则
+     *
+     * 基础值: 1-3 随机
+     * 难度加成: 每+1难度, x1.5
+     * 灵石袋: 0.1% 概率获得100倍
+     * 功法加成: 功法8 聚灵术提供掉率倍率
+     */
+    calculateStoneDrop(enemy) {
+        const config = TECHNIQUE_CONFIG.stoneDrop;
+
+        // 基础掉落: 1-3 随机
+        const baseRoll = Math.floor(Math.random() * (config.baseMax - config.baseMin + 1)) + config.baseMin;
+
+        // 难度加成: difficultyMult^(difficulty-1)
+        // 难度1 = x1, 难度2 = x1.5, 难度3 = x2.25, 以此类推
+        const difficultyMult = Math.pow(config.difficultyMult, Math.max(0, this.difficulty - 1));
+
+        let drop = baseRoll * difficultyMult;
+
+        // 功法加成: 聚灵术 (功法8)
+        if (this.technique) {
+            const techBonuses = this.technique.getAllBonuses();
+            if (techBonuses.stoneDrop > 1) {
+                drop *= techBonuses.stoneDrop;
+            }
+        }
+
+        // 灵石袋判定: 0.1% 概率
+        let isBag = false;
+        if (Math.random() < config.bagChance) {
+            drop *= config.bagMult;
+            isBag = true;
+        }
+
+        return new BigNum(drop);
     }
 
     handleLoss() {
@@ -1230,15 +1313,22 @@ class Game {
         // 秘宝丹药倍率
         for(let k in this.equippedTreasures) {
             const t = this.equippedTreasures[k];
-            if(t && t.attrType.type === 'pill_mult') pillMult = pillMult.mul(t.val); 
+            if(t && t.attrType.type === 'pill_mult') pillMult = pillMult.mul(t.val);
         }
         // 深渊遗宝刷丹倍率
         if (this.abyssRelic) {
             const relicBonuses = this.abyssRelic.getEffectiveBonuses();
             pillMult = pillMult.mul(relicBonuses.pillEffectMultiplier);
         }
+        // 功法系统丹药效果倍率 (功法4)
+        if (this.technique) {
+            const techBonuses = this.technique.getAllBonuses();
+            if (techBonuses.pillMult > 1) {
+                pillMult = pillMult.mul(techBonuses.pillMult);
+            }
+        }
         const pill = new Item(this.difficulty, 'pill');
-        pill.hpValue = pill.hpValue.mul(pillMult); 
+        pill.hpValue = pill.hpValue.mul(pillMult);
         pill.atkValue = pill.atkValue.mul(pillMult);
         this.autoConsumePill(pill);
 
@@ -1255,7 +1345,7 @@ class Game {
     rollTowerLoot(isBoss) {
         let drop = new BigNum(SCALE_TOWER_DROP).pow(this.towerLevel).mul(1 + this.cultRound);
         if(isBoss) drop = drop.mul(10);
-        
+
         // 秘宝爬塔掉率
         let tMult = new BigNum(1);
         for(let k in this.equippedTreasures) {
@@ -1263,13 +1353,21 @@ class Game {
             if(t && t.attrType.type === 'tower_drop') tMult = tMult.mul(t.val);
         }
         drop = drop.mul(tMult);
-        
+
         // 深渊遗宝爬塔掉率
         if (this.abyssRelic) {
             const relicBonuses = this.abyssRelic.getEffectiveBonuses();
             drop = drop.mul(relicBonuses.towerDropMultiplier);
         }
-        
+
+        // 功法系统真意掉率加成 (功法5)
+        if (this.technique) {
+            const techBonuses = this.technique.getAllBonuses();
+            if (techBonuses.essenceDrop > 1) {
+                drop = drop.mul(techBonuses.essenceDrop);
+            }
+        }
+
         this.lawFragments = this.lawFragments.add(drop);
         this.log('GAIN', `获得真意: ${formatNum(drop)}`);
         this.updateSystemUI();
@@ -1388,8 +1486,11 @@ class Game {
         
         setVal('treasure-daily', `${this.treasureDaily}/${this.treasureLimit}`);
         setVal('treasure-frags', formatNum(this.treasureFragments));
-        
+
         setVal('chest-count', this.treasureChests);
+
+        // 更新灵石显示
+        setVal('res-stones', formatNum(this.stones));
     }
 
     updateStatsUI() {
@@ -1586,7 +1687,7 @@ class Game {
         const el = document.createElement('div');
         el.className = 'damage-text';
         el.innerHTML = (crit ? '💥 ' : '') + formatNum(val);
-        
+
         if (target === 'player') {
             el.style.color = '#f44336';
             el.style.left = '50%';
@@ -1602,6 +1703,43 @@ class Game {
         }
         overlay.appendChild(el);
         setTimeout(()=>el.remove(), 800);
+    }
+
+    /**
+     * 显示灵石掉落跳字
+     * @param {BigNum} amount - 灵石数量
+     * @param {string} enemyId - 敌人ID，用于定位显示位置
+     */
+    showStoneDrop(amount, enemyId) {
+        const overlay = document.getElementById('damage-overlay');
+        const el = document.createElement('div');
+        el.className = 'stone-drop-text';
+        el.innerHTML = `💎 ${formatNum(amount)}`;
+
+        // 样式设置
+        el.style.position = 'absolute';
+        el.style.color = '#10b981';
+        el.style.fontSize = '1.1rem';
+        el.style.fontWeight = 'bold';
+        el.style.textShadow = '0 0 4px rgba(16,185,129,0.5)';
+        el.style.pointerEvents = 'none';
+        el.style.zIndex = '100';
+        el.style.animation = 'floatUp 1s ease-out forwards';
+
+        // 根据敌人位置定位，如果没有敌人元素则随机位置
+        const tEl = document.getElementById(`e-${enemyId}`);
+        if (tEl) {
+            const rect = tEl.getBoundingClientRect();
+            const overlayRect = overlay.getBoundingClientRect();
+            el.style.left = (rect.left - overlayRect.left + rect.width/2 - 30) + 'px';
+            el.style.top = (rect.top - overlayRect.top) + 'px';
+        } else {
+            el.style.left = (10 + Math.random()*70) + '%';
+            el.style.top = (30 + Math.random()*30) + '%';
+        }
+
+        overlay.appendChild(el);
+        setTimeout(()=>el.remove(), 1000);
     }
     
     showSkillEffect(txt) {

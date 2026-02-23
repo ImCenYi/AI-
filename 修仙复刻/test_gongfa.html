@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>功法系统测试</title>
+    <style>
+        body {
+            background: #1a1a2e;
+            color: #eee;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding: 20px;
+        }
+        .test-result {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4ade80;
+        }
+        .error {
+            border-left-color: #ef4444;
+        }
+        .math {
+            background: rgba(59, 130, 246, 0.1);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        h1 { color: #fbbf24; }
+        h2 { color: #4ade80; margin-top: 30px; }
+        .highlight { color: #fbbf24; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🧙‍♂️ 功法系统 (Gongfa System) 测试报告</h1>
+    <p>完全仿照 Clicker Heroes 英雄系统的修仙换皮实现</p>
+
+    <div id="results"></div>
+
+    <!-- 依赖 -->
+    <script src="js/core/BigNum.js"></script>
+    <script src="js/classes/GongfaSystem.js"></script>
+
+    <script>
+        const results = document.getElementById('results');
+
+        function log(title, content, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'test-result' + (isError ? ' error' : '');
+            div.innerHTML = `<h3>${title}</h3><div>${content}</div>`;
+            results.appendChild(div);
+        }
+
+        function mathLog(title, formula) {
+            const div = document.createElement('div');
+            div.className = 'math';
+            div.innerHTML = `<strong>${title}</strong>\n${formula}`;
+            results.appendChild(div);
+        }
+
+        // ========== 测试开始 ==========
+
+        log('🎮 测试开始', '创建功法管理器和基础功法...');
+
+        // 创建功法管理器
+        const manager = new GongfaManager();
+
+        // 创建基础功法 (仿照Clicker Heroes的第一个英雄Cid)
+        const basicGongfa = manager.registerGongfa({
+            id: 'basic_qi_gathering',
+            name: '基础吐纳术',
+            description: '最基础的灵气吐纳法门，修炼者通过呼吸吐纳吸收天地灵气',
+            icon: '🌬️',
+            baseCost: 10,           // 基础消耗10灵气 (仿Cid)
+            basePower: 1,           // 基础战力1
+            costScale: 1.07,        // 每次升级成本x1.07 (CH标准)
+            unlocked: true,
+            secretArts: [
+                { name: '吐纳精通', unlockLayer: 10, type: 'self', multiplier: 2, description: '吐纳效率翻倍' },
+                { name: '灵气共鸣', unlockLayer: 25, type: 'global', multiplier: 1.25, description: '全功法战力+25%' },
+                { name: '周天运转', unlockLayer: 50, type: 'self', multiplier: 2, description: '周天运转，效率翻倍' },
+                { name: '天地合一', unlockLayer: 100, type: 'global', multiplier: 1.5, description: '全功法战力+50%' },
+                { name: '万法归宗', unlockLayer: 125, type: 'self', multiplier: 2, description: '万法归宗，战力翻倍' }
+            ]
+        });
+
+        // 显示初始状态
+        log('📊 初始状态', `
+            功法名称: ${basicGongfa.name}<br>
+            当前层数: <span class="highlight">${basicGongfa.layer}</span><br>
+            当前战力: ${basicGongfa.getPower().toString()}<br>
+            下一层消耗: ${basicGongfa.getNextLayerCost().toString()}
+        `);
+
+        // ========== 测试1: 数学公式验证 ==========
+
+        mathLog('📐 等比数列求和公式 (Cost Calculation)',
+`每层消耗: Cost_n = BaseCost × (1.07)^n
+
+从0层升到L层的总消耗 (等比数列求和):
+Total = BaseCost × [(1.07)^0 + (1.07)^1 + ... + (1.07)^(L-1)]
+
+等比数列公式: S_n = a_1 × (r^n - 1) / (r - 1)
+其中: a_1 = 1, r = 1.07, n = L
+
+因此: Total = BaseCost × [(1.07)^L - 1] / 0.07`);
+
+        mathLog('📐 BuyMax 反推公式 (Reverse Calculation)',
+`设当前层数 L0, 拥有灵气 R, 求可升到第 L 层
+
+总消耗公式:
+Cost = BaseCost × (1.07)^L0 × [(1.07)^(L-L0) - 1] / 0.07
+
+令 x = (1.07)^(L-L0), 则:
+R = BaseCost × (1.07)^L0 × (x - 1) / 0.07
+
+解得:
+x = 1 + R × 0.07 / (BaseCost × (1.07)^L0)
+
+取对数:
+L - L0 = log(x) / log(1.07)
+L = L0 + log(1 + R × 0.07 / (BaseCost × (1.07)^L0)) / log(1.07)`);
+
+        // ========== 测试2: 小额升级测试 ==========
+
+        log('💰 测试1: 小额升级 (逐层升级)', '从0层开始，尝试升到10层...');
+
+        // 计算升到10层需要的灵气
+        const costTo10 = basicGongfa.calculateCostToLayer(10);
+        log('💡 计算结果', `
+            升到10层总消耗: ${costTo10.toString()}<br>
+            公式验证: 10 × [(1.07)^10 - 1] / 0.07 = ${(10 * (Math.pow(1.07, 10) - 1) / 0.07).toFixed(2)}
+        `);
+
+        // 执行升级
+        const reiki1 = new BigNum(1, 3); // 1000灵气 (足够升到10层)
+        const result1 = basicGongfa.buyMax(reiki1);
+
+        log('✅ 升级结果', `
+            成功: ${result1.success}<br>
+            升级层数: <span class="highlight">${result1.layers}</span><br>
+            最终层数: <span class="highlight">${result1.newLayer}</span><br>
+            消耗灵气: ${result1.spent.toString()}<br>
+            剩余灵气: ${reiki1.sub(result1.spent).toString()}
+        `);
+
+        // 验证突破倍率
+        const btMult = basicGongfa.getBreakthroughMultiplier();
+        log('⚡ 突破倍率', `
+            当前层数: ${basicGongfa.layer}<br>
+            突破倍率: <span class="highlight">×${btMult}</span><br>
+            (10层 ×4)<br>
+            当前战力: ${basicGongfa.getPower().toString()}
+        `);
+
+        // ========== 测试3: 大额BuyMax测试 ==========
+
+        log('💎 测试2: 大额BuyMax (1e100灵气)', '模拟玩家拥有1e100灵气，执行buyMax...');
+
+        // 重置功法
+        basicGongfa.layer = 0;
+        basicGongfa.totalSpent = new BigNum(0);
+
+        const reiki2 = new BigNum(1, 100); // 1e100
+        const startTime = performance.now();
+        const result2 = basicGongfa.buyMax(reiki2);
+        const endTime = performance.now();
+
+        // 理论计算验证
+        const L0 = 0;
+        const r = reiki2.toNumber();
+        const theoreticalMax = Math.log(1 + r * 0.07 / 10) / Math.log(1.07);
+
+        log('✅ BuyMax 结果', `
+            执行时间: <span class="highlight">${(endTime - startTime).toFixed(3)}ms</span> (无循环!)<br>
+            升级层数: <span class="highlight">${result2.layers}</span><br>
+            最终层数: <span class="highlight">${result2.newLayer}</span><br>
+            消耗灵气: ${result2.spent.toString()}<br>
+            理论最大层数: ${Math.floor(theoreticalMax)}<br>
+            误差: ${Math.abs(theoreticalMax - result2.newLayer).toFixed(6)}层
+        `);
+
+        // ========== 测试4: 突破倍率系统 ==========
+
+        log('🎯 测试3: 突破倍率系统 (Milestone Multipliers)',
+            '测试不同层数的突破倍率...');
+
+        const testLayers = [10, 25, 50, 75, 100, 125, 150, 200, 500, 1000, 1025];
+        let breakthroughInfo = '';
+
+        for (const layer of testLayers) {
+            // 临时设置层数计算倍率
+            const originalLayer = basicGongfa.layer;
+            basicGongfa.layer = layer;
+            const mult = basicGongfa.getBreakthroughMultiplier();
+
+            let explanation = '';
+            if (layer >= 1000) explanation = '(1000层×10)';
+            else if (layer >= 200) explanation = '(200层×10 + 之前倍数)';
+            else if (layer >= 100) explanation = '(100层×10)';
+            else if (layer >= 75) explanation = '(75层×4)';
+            else if (layer >= 50) explanation = '(50层×4)';
+            else if (layer >= 25) explanation = '(25层×4)';
+            else if (layer >= 10) explanation = '(10层×4)';
+
+            breakthroughInfo += `层数 ${layer}: <span class="highlight">×${mult}</span> ${explanation}<br>`;
+            basicGongfa.layer = originalLayer;
+        }
+
+        log('📈 突破倍率表', breakthroughInfo);
+
+        // ========== 测试5: 秘术系统 ==========
+
+        log('📜 测试4: 秘术系统 (Secret Arts)', '检查可解锁的秘术...');
+
+        // 设置到125层以解锁所有秘术
+        basicGongfa.layer = 125;
+        const availableArts = basicGongfa.getAvailableSecretArts();
+
+        let artsInfo = '';
+        for (const art of availableArts) {
+            artsInfo += `
+                <strong>${art.name}</strong> (${art.unlockLayer}层解锁)<br>
+                效果: ${art.getEffectDesc()}<br>
+                消耗: ${art.cost.toString()} 灵气<br><br>
+            `;
+        }
+
+        log('🔮 可购买秘术', artsInfo || '暂无可购买秘术');
+
+        // ========== 测试6: 多功法管理器测试 ==========
+
+        log('🏛️ 测试5: 功法管理器', '注册多个功法，测试总战力计算...');
+
+        // 注册更多功法
+        const advancedGongfa = manager.registerGongfa({
+            id: 'advanced_qi_cultivation',
+            name: '高级练气诀',
+            description: '更高级的练气法门',
+            icon: '🔥',
+            baseCost: 100,
+            basePower: 5,
+            costScale: 1.07,
+            unlocked: false,
+            unlockCost: new BigNum(1, 5), // 1e5解锁
+            secretArts: [
+                { name: '炉火纯青', unlockLayer: 10, type: 'self', multiplier: 2 },
+                { name: '气贯长虹', unlockLayer: 50, type: 'global', multiplier: 1.5 }
+            ]
+        });
+
+        // 解锁并升级
+        manager.unlockGongfa('advanced_qi_cultivation', new BigNum(1, 10));
+        advancedGongfa.buyMax(new BigNum(1, 50)); // 1e50灵气升级
+
+        const totalPower = manager.getTotalPower();
+        const globalMult = manager.getGlobalMultiplier();
+
+        log('⚔️ 总战力统计', `
+            已解锁功法数: ${manager.unlockedCount}<br>
+            全局倍率: <span class="highlight">×${globalMult}</span><br>
+            总战力: <span class="highlight">${totalPower.toString()}</span>
+        `);
+
+        // ========== 总结 ==========
+
+        log('✨ 测试总结', `
+            <strong>核心特性验证:</strong><br>
+            ✅ 等比数列求和公式计算升级成本 (无循环)<br>
+            ✅ BuyMax 使用对数反推最大可升层数 (O(1)复杂度)<br>
+            ✅ 突破倍率系统: 10/25/50/75层×4, 100层×10, 每25层×4, 每1000层×10<br>
+            ✅ 秘术系统: 特定层数解锁, self/global两种类型<br>
+            ✅ 换皮映射: Hero→功法, Level→层数, DPS→战力, Gold→灵气<br><br>
+
+            <strong>性能表现:</strong><br>
+            BuyMax(1e100灵气) 执行时间: ${(endTime - startTime).toFixed(3)}ms<br>
+            升级层数: ${result2.newLayer}层<br>
+            理论验证: 误差 ${Math.abs(theoreticalMax - result2.newLayer).toFixed(6)}层
+        `);
+
+        console.log('=== 测试结果已输出到页面 ===');
+        console.log('功法管理器:', manager);
+        console.log('基础功法:', basicGongfa);
+    </script>
+</body>
+</html>

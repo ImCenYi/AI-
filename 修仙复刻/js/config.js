@@ -691,6 +691,209 @@ const STAR_BEAST_STATS = {
     rewardMult: (difficultyLevel) => difficultyLevel
 };
 
+// ==================== 功法系统配置 (重构版) ====================
+
+const TECHNIQUE_CONFIG = {
+    // 灵石掉落配置
+    stoneDrop: {
+        // 基础掉落范围
+        baseMin: 1,
+        baseMax: 3,
+        // 难度倍数: 每+1难度, x1.5
+        difficultyMult: 1.5,
+        // 灵石袋触发概率: 0.1% = 0.001
+        bagChance: 0.001,
+        // 灵石袋倍数: 100倍
+        bagMult: 100
+    },
+
+    // 修炼暴击配置
+    critConfig: {
+        // 暴击概率: 5% = 0.05
+        chance: 0.05,
+        // 暴击效果: 连升3级
+        bonusLayers: 3,
+        // 暴击时消耗: 只扣1级成本 (normal) 或免费 (free)
+        costMode: 'normal' // 'normal' = 扣1级成本, 'free' = 免费
+    },
+
+    // 功法配置 - 8个功法
+    techniques: {
+        // 功法1: 攻击力加成 (x1.1/次, 成本x2)
+        atkBasic: {
+            id: 'atkBasic',
+            name: '金刚诀',
+            icon: '⚔️',
+            desc: '以气御剑，增强攻击力',
+            color: '#ef4444',
+            baseCost: 10,           // 基础消耗10灵石
+            costScale: 2,           // 成本每次x2
+            effectScale: 1.1,       // 效果每次x1.1
+            maxLayer: 1000,
+            bonusType: 'atkMult',   // 攻击倍率
+            unlocked: true,         // 开局解锁
+            unlockRequirement: null
+        },
+        // 功法2: 生命值加成 (x1.1/次, 成本x2)
+        hpBasic: {
+            id: 'hpBasic',
+            name: '玄武心经',
+            icon: '🛡️',
+            desc: '龟息之法，强身健体',
+            color: '#3b82f6',
+            baseCost: 10,
+            costScale: 2,
+            effectScale: 1.1,
+            maxLayer: 1000,
+            bonusType: 'hpMult',    // 生命倍率
+            unlocked: true,
+            unlockRequirement: null
+        },
+        // 功法3: 丹药掉落数量 (x2/次, 成本x5)
+        pillCount: {
+            id: 'pillCount',
+            name: '采药术',
+            icon: '🌿',
+            desc: '识百草，增丹产',
+            color: '#22c55e',
+            baseCost: 50,
+            costScale: 5,           // 成本每次x5
+            effectScale: 2,         // 效果每次x2
+            maxLayer: 100,
+            bonusType: 'pillCount', // 丹药数量
+            unlocked: true,
+            unlockRequirement: null
+        },
+        // 功法4: 丹药效果倍率 (x2/次, 成本x5)
+        pillEffect: {
+            id: 'pillEffect',
+            name: '炼丹诀',
+            icon: '🔥',
+            desc: '火候精妙，丹效倍增',
+            color: '#f97316',
+            baseCost: 50,
+            costScale: 5,
+            effectScale: 2,
+            maxLayer: 100,
+            bonusType: 'pillMult',  // 丹药效果
+            unlocked: true,
+            unlockRequirement: null
+        },
+        // 功法5: 真意掉率 (x10/次, 成本x1000)
+        essenceDrop: {
+            id: 'essenceDrop',
+            name: '悟道心法',
+            icon: '☯️',
+            desc: '感悟天道，真意自现',
+            color: '#a855f7',
+            baseCost: 1000,
+            costScale: 1000,        // 成本每次x1000
+            effectScale: 10,        // 效果每次x10
+            maxLayer: 50,
+            bonusType: 'essenceDrop', // 真意掉率
+            unlocked: false,
+            unlockRequirement: { layer: 10, technique: 'atkBasic' } // 金刚诀10层解锁
+        },
+        // 功法6: 攻击力加成 (x15/次, 成本x10)
+        atkAdvanced: {
+            id: 'atkAdvanced',
+            name: '诛仙剑诀',
+            icon: '🗡️',
+            desc: '诛仙灭魔，攻击力暴涨',
+            color: '#dc2626',
+            baseCost: 1000,
+            costScale: 10,          // 成本每次x10
+            effectScale: 15,        // 效果每次x15
+            maxLayer: 200,
+            bonusType: 'atkMult',   // 攻击倍率
+            unlocked: false,
+            unlockRequirement: { layer: 20, technique: 'hpBasic' } // 玄武心经20层解锁
+        },
+        // 功法7: 生命值加成 (x15/次, 成本x10)
+        hpAdvanced: {
+            id: 'hpAdvanced',
+            name: '不灭金身',
+            icon: '✨',
+            desc: '肉身成圣，不死不灭',
+            color: '#f59e0b',
+            baseCost: 1000,
+            costScale: 10,
+            effectScale: 15,
+            maxLayer: 200,
+            bonusType: 'hpMult',    // 生命倍率
+            unlocked: false,
+            unlockRequirement: { layer: 20, technique: 'pillCount' } // 采药术20层解锁
+        },
+        // 功法8: 灵石掉率 (x1.2/次, 成本x2)
+        stoneDrop: {
+            id: 'stoneDrop',
+            name: '聚灵术',
+            icon: '💎',
+            desc: '引天地灵气，聚而为石',
+            color: '#10b981',
+            baseCost: 100,
+            costScale: 2,           // 成本每次x2
+            effectScale: 1.2,       // 效果每次x1.2
+            maxLayer: 500,
+            bonusType: 'stoneDrop', // 灵石掉率
+            unlocked: true,         // 开局解锁
+            unlockRequirement: null
+        }
+    },
+
+    // 神通配置 - 每个功法5/10/15级解锁
+    divineAbilities: {
+        // 金刚诀神通
+        atkBasic: [
+            { layer: 5, name: '剑气初成', desc: '攻击力+50%', effect: { type: 'atkMult', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '人剑合一', desc: '攻击力+100%', effect: { type: 'atkMult', value: 2 }, costMult: 10 },
+            { layer: 15, name: '万剑归宗', desc: '攻击力+200%', effect: { type: 'atkMult', value: 3 }, costMult: 20 }
+        ],
+        // 玄武心经神通
+        hpBasic: [
+            { layer: 5, name: '铜皮铁骨', desc: '生命值+50%', effect: { type: 'hpMult', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '生生不息', desc: '生命值+100%', effect: { type: 'hpMult', value: 2 }, costMult: 10 },
+            { layer: 15, name: '滴血重生', desc: '生命值+200%', effect: { type: 'hpMult', value: 3 }, costMult: 20 }
+        ],
+        // 采药术神通
+        pillCount: [
+            { layer: 5, name: '识草术', desc: '丹药掉落+50%', effect: { type: 'pillCount', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '灵草感应', desc: '丹药掉落+100%', effect: { type: 'pillCount', value: 2 }, costMult: 10 },
+            { layer: 15, name: '百草之王', desc: '丹药掉落+200%', effect: { type: 'pillCount', value: 3 }, costMult: 20 }
+        ],
+        // 炼丹诀神通
+        pillEffect: [
+            { layer: 5, name: '火候精通', desc: '丹药效果+50%', effect: { type: 'pillMult', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '丹纹天成', desc: '丹药效果+100%', effect: { type: 'pillMult', value: 2 }, costMult: 10 },
+            { layer: 15, name: '九转金丹', desc: '丹药效果+200%', effect: { type: 'pillMult', value: 3 }, costMult: 20 }
+        ],
+        // 悟道心法神通
+        essenceDrop: [
+            { layer: 5, name: '初窥天道', desc: '真意掉率+50%', effect: { type: 'essenceDrop', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '天人合一', desc: '真意掉率+100%', effect: { type: 'essenceDrop', value: 2 }, costMult: 10 },
+            { layer: 15, name: '道法自然', desc: '真意掉率+200%', effect: { type: 'essenceDrop', value: 3 }, costMult: 20 }
+        ],
+        // 诛仙剑诀神通
+        atkAdvanced: [
+            { layer: 5, name: '剑意纵横', desc: '攻击力+100%', effect: { type: 'atkMult', value: 2 }, costMult: 5 },
+            { layer: 10, name: '一剑破万法', desc: '攻击力+300%', effect: { type: 'atkMult', value: 4 }, costMult: 10 },
+            { layer: 15, name: '诛仙剑阵', desc: '攻击力+500%', effect: { type: 'atkMult', value: 6 }, costMult: 20 }
+        ],
+        // 不灭金身神通
+        hpAdvanced: [
+            { layer: 5, name: '金刚不坏', desc: '生命值+100%', effect: { type: 'hpMult', value: 2 }, costMult: 5 },
+            { layer: 10, name: '肉身成圣', desc: '生命值+300%', effect: { type: 'hpMult', value: 4 }, costMult: 10 },
+            { layer: 15, name: '不死不灭', desc: '生命值+500%', effect: { type: 'hpMult', value: 6 }, costMult: 20 }
+        ],
+        // 聚灵术神通
+        stoneDrop: [
+            { layer: 5, name: '灵气感应', desc: '灵石掉率+50%', effect: { type: 'stoneDrop', value: 1.5 }, costMult: 5 },
+            { layer: 10, name: '灵脉亲和', desc: '灵石掉率+100%', effect: { type: 'stoneDrop', value: 2 }, costMult: 10 },
+            { layer: 15, name: '聚灵成海', desc: '灵石掉率+200%', effect: { type: 'stoneDrop', value: 3 }, costMult: 20 }
+        ]
+    }
+};
+
 // Export for module systems if needed
 try {
     if (typeof module !== 'undefined' && module.exports) {
@@ -704,7 +907,8 @@ try {
             ANCIENT_TREASURE_ATTR_TYPES, ANCIENT_TREASURE_UPGRADE_COST,
             ANCIENT_TREASURE_SYNERGIES, ANCIENT_TREASURE_DRAW_RATES, ANCIENT_TREASURE_PITY,
             ZHOUTIAN_SECTORS, ZHOUTIAN_QUALITIES, ZHOUTIAN_WASH_COSTS, ZHOUTIAN_BASE_BONUSES,
-            STAR_BEAST_DIFFICULTIES, STAR_BEAST_STATS
+            STAR_BEAST_DIFFICULTIES, STAR_BEAST_STATS,
+            TECHNIQUE_CONFIG
         };
     }
 } catch (e) {}

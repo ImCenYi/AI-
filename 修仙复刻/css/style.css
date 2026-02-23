@@ -81,7 +81,7 @@ h1 { margin: 0; font-size: 1.2rem; color: #ffd700; }
 /* Main Layout */
 #game-container {
     display: grid;
-    grid-template-columns: 320px 1fr 360px;
+    grid-template-columns: 280px 1fr 480px;
     flex: 1;
     gap: 10px;
     padding: 10px;

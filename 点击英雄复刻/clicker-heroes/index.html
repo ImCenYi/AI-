@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="点击英雄 - 一款有趣的增量点击游戏">
+    <title>点击英雄 | Clicker Heroes</title>
+    
+    <!-- 主样式文件 -->
+    <link rel="stylesheet" href="css/main.css">
+    
+    <!-- 网站图标 -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔️</text></svg>">
+</head>
+<body>
+    <!-- 游戏主容器 -->
+    <div class="game-container">
+        
+        <!-- ==================== 顶部统计栏 ==================== -->
+        <header class="stats-bar">
+            <div class="stat-item">
+                <span class="stat-label">金币</span>
+                <span class="stat-value" id="gold-display">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">DPS</span>
+                <span class="stat-value" id="dps-display">0/秒</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">区域</span>
+                <span class="stat-value" id="zone-display">区域 1</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">点击伤害</span>
+                <span class="stat-value" id="click-damage-display">1</span>
+            </div>
+        </header>
+        
+        <!-- ==================== 主游戏区域 ==================== -->
+        <main class="game-main">
+            
+            <!-- 左侧：英雄列表面板 -->
+            <aside class="hero-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">英雄</h2>
+                </div>
+                <div class="hero-list" id="hero-list">
+                    <!-- 英雄卡片将通过JavaScript动态生成 -->
+                    <div class="hero-card placeholder">
+                        <div class="hero-icon" style="background-color: #555;">?</div>
+                        <div class="hero-info">
+                            <div class="hero-name">暂无英雄</div>
+                            <div class="hero-level">点击怪物获取金币</div>
+                            <div class="hero-dps">雇佣英雄来增加DPS</div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- 中央：怪物战斗区域 -->
+            <section class="monster-area">
+                <!-- 怪物信息 -->
+                <div class="monster-info">
+                    <div class="monster-name" id="monster-name">小史莱姆</div>
+                    <div class="monster-level" id="monster-level">Lv.1</div>
+                </div>
+                
+                <!-- Canvas渲染区域 -->
+                <canvas id="monster-canvas"></canvas>
+                
+                <!-- HP条 -->
+                <div class="hp-bar-container">
+                    <div class="hp-bar-fill" id="hp-bar-fill" style="width: 100%;"></div>
+                    <div class="hp-text" id="hp-text">100 / 100</div>
+                </div>
+            </section>
+            
+            <!-- 右侧：升级详情面板 -->
+            <aside class="upgrade-panel">
+                <h2 class="upgrade-title">升级详情</h2>
+                
+                <div class="selected-hero-details" id="upgrade-panel">
+                    <div class="detail-row">
+                        <span class="detail-label">英雄名称</span>
+                        <span class="detail-value" id="selected-hero-name">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">当前等级</span>
+                        <span class="detail-value" id="selected-hero-level">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">DPS贡献</span>
+                        <span class="detail-value" id="selected-hero-dps">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">升级成本</span>
+                        <span class="detail-value" id="upgrade-cost">-</span>
+                    </div>
+                </div>
+                
+                <div class="buy-section">
+                    <div class="cost-display">
+                        <span class="cost-label">升级费用</span>
+                        <div class="cost-value" id="buy-cost">-</div>
+                    </div>
+                    <button class="btn-buy" id="buy-button" disabled>
+                        购买升级
+                    </button>
+                </div>
+            </aside>
+            
+        </main>
+        
+        <!-- ==================== 底部控制栏 ==================== -->
+        <footer class="control-bar">
+            <button class="btn-control" id="settings-button">
+                ⚙️ 设置
+            </button>
+            <button class="btn-control" id="achievements-button">
+                🏆 成就
+            </button>
+        </footer>
+        
+    </div>
+    
+    <!-- ==================== 模态框 ==================== -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modal-title">标题</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-content">
+                <!-- 模态框内容将通过JavaScript动态生成 -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== JavaScript 文件 ==================== -->
+    
+    <!-- 工具类 -->
+    <script src="js/utils/NumberFormatter.js"></script>
+    <script src="js/utils/SaveManager.js"></script>
+    
+    <!-- 数据（需要先加载） -->
+    <script src="js/data/heroes.js"></script>
+
+    <!-- 核心系统 -->
+    <script src="js/core/EventBus.js"></script>
+    <script src="js/core/GameState.js"></script>
+    <script src="js/core/GameLoop.js"></script>
+
+    <!-- 实体类 -->
+    <script src="js/entities/Monster.js"></script>
+    <script src="js/entities/Hero.js"></script>
+    <script src="js/entities/Player.js"></script>
+    <script src="js/entities/Zone.js"></script>
+
+    <!-- 系统 -->
+    <script src="js/systems/CombatSystem.js"></script>
+    <script src="js/systems/UpgradeSystem.js"></script>
+    <script src="js/systems/ProgressSystem.js"></script>
+
+    <!-- 游戏主类（依赖上面的所有模块） -->
+    <script src="js/core/Game.js"></script>
+    
+    <!-- 渲染器 -->
+    <script src="js/rendering/CanvasRenderer.js"></script>
+    <script src="js/rendering/UIManager.js"></script>
+    
+    <!-- 游戏入口 -->
+    <script src="js/main.js"></script>
+    
+</body>
+</html>

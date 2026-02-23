@@ -95,9 +95,188 @@
     animation: progress-fill 1s ease-out forwards;
 }
 
+/* 灵石掉落跳字动画 */
+@keyframes floatUp {
+    0% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: translateY(-20px) scale(1.1);
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-40px) scale(0.9);
+    }
+}
+
+.stone-drop-text {
+    position: absolute;
+    pointer-events: none;
+    z-index: 100;
+    white-space: nowrap;
+}
+
 /* 按钮悬停光效 */
 .sys-btn:hover {
     box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+}
+
+/* ========== 功法系统样式 ========== */
+.technique-card {
+    background: linear-gradient(135deg, rgba(16,185,129,0.1), rgba(16,185,129,0.05));
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+
+.technique-card:hover {
+    border-color: rgba(16,185,129,0.6);
+    box-shadow: 0 0 10px rgba(16,185,129,0.2);
+}
+
+.technique-card.locked {
+    opacity: 0.6;
+    background: rgba(100,100,100,0.1);
+    border-color: rgba(100,100,100,0.3);
+}
+
+.technique-card.maxed {
+    background: linear-gradient(135deg, rgba(251,191,36,0.15), rgba(251,191,36,0.05));
+    border-color: rgba(251,191,36,0.5);
+}
+
+.technique-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.technique-icon {
+    font-size: 1.5rem;
+}
+
+.technique-name {
+    font-weight: bold;
+    color: #fff;
+    flex: 1;
+}
+
+.technique-layer {
+    color: #10b981;
+    font-size: 0.85rem;
+}
+
+.technique-progress-bar {
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.technique-progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.technique-desc {
+    font-size: 0.75rem;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.technique-current {
+    font-size: 0.8rem;
+    color: #10b981;
+    margin-bottom: 8px;
+}
+
+.technique-next {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.technique-upgrade-btn {
+    padding: 4px 12px;
+    background: linear-gradient(to right, #10b981, #059669);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.technique-upgrade-btn:hover:not(:disabled) {
+    box-shadow: 0 0 10px rgba(16,185,129,0.5);
+    transform: translateY(-1px);
+}
+
+.technique-upgrade-btn:disabled {
+    background: #4b5563;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.technique-maxed {
+    text-align: center;
+    color: #fbbf24;
+    font-weight: bold;
+    padding: 8px;
+}
+
+.technique-status {
+    text-align: center;
+    color: #888;
+    padding: 8px;
+    font-size: 0.8rem;
+}
+
+.resonance-item {
+    padding: 8px;
+    margin: 4px 0;
+    background: rgba(139,92,246,0.15);
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+
+.resonance-item.active {
+    border-left: 3px solid #c084fc;
+}
+
+.resonance-name {
+    color: #c084fc;
+    font-weight: bold;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.resonance-desc {
+    color: #aaa;
+    font-size: 0.75rem;
+}
+
+.bonus-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.bonus-item {
+    padding: 4px 8px;
+    background: rgba(16,185,129,0.1);
+    border-radius: 4px;
+    font-size: 0.8rem;
+    color: #10b981;
 }
 </style>
 </head>
@@ -189,6 +368,7 @@
             <button class="tab-btn" onclick="game.switchTab('zhou-tian')">⭐ 周天星窍</button>
             <button class="tab-btn" onclick="game.openStarBeastModal()">🌟 星空巨兽</button>
             <button class="tab-btn" onclick="game.switchTab('abyss')">🌑 深渊遗宝</button>
+            <button class="tab-btn" onclick="game.switchTab('technique')">📚 功法修炼</button>
         </div>
 
         <!-- Law Cultivation Tab (法则悟道 - 合并法则修炼+通天塔) -->
@@ -499,6 +679,27 @@
                     * 挑战深渊BOSS获取遗宝<br>
                     * 遗宝可升级，满级自动分解<br>
                     * 碎片可兑换任意遗宝
+                </div>
+            </div>
+        </div>
+
+        <!-- Technique Tab (功法修炼) - 紧凑布局 -->
+        <div id="tab-technique" class="tab-content">
+            <div class="system-section" style="padding: 10px;">
+                <!-- 顶部统计行 -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span style="color: #10b981; font-weight: bold;">📚 功法修炼</span>
+                    <span style="color: #fbbf24; font-size: 0.9rem;">💎 <span id="res-stones">0</span></span>
+                </div>
+
+                <!-- 功法加成总览 (紧凑) -->
+                <div id="technique-total-bonus" style="margin-bottom: 10px; padding: 6px; background: rgba(16,185,129,0.1); border-radius: 4px; font-size: 0.75rem;">
+                    <div style="color: #888;">暂无功法加成</div>
+                </div>
+
+                <!-- 功法列表 (紧凑) -->
+                <div id="technique-list" style="max-height: 60vh; overflow-y: auto;">
+                    <!-- 功法卡片动态生成 -->
                 </div>
             </div>
         </div>
@@ -1334,6 +1535,7 @@
 <script src="js/classes/StarBeastDungeon.js"></script>
 <script src="js/classes/AbyssRelic.js"></script>
 <script src="js/classes/AbyssDungeon.js"></script>
+<script src="js/classes/Technique.js"></script>
 <script src="js/game/Game.js"></script>
 
 <!-- Initialize Game -->

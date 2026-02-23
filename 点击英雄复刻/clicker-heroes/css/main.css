@@ -1,0 +1,747 @@
+/**
+ * 点击英雄游戏 - 主样式文件
+ * 深紫色主题 + 金色强调
+ * @file css/main.css
+ */
+
+/* ==================== 基础样式重置 ==================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    font-family: 'Microsoft YaHei', 'Arial', sans-serif;
+    background-color: #0d0814;
+    color: #fff;
+    overflow: hidden;
+}
+
+/* ==================== 颜色变量 ==================== */
+:root {
+    --bg-primary: #1a1225;
+    --bg-secondary: #2d1b4e;
+    --bg-dark: #0d0814;
+    --accent-gold: #ffd700;
+    --accent-gold-dark: #b8860b;
+    --text-primary: #ffffff;
+    --text-secondary: #b8b8b8;
+    --hp-green: #2ecc71;
+    --hp-yellow: #f1c40f;
+    --hp-red: #e74c3c;
+    --border-color: rgba(255, 215, 0, 0.3);
+    --shadow-gold: 0 0 10px rgba(255, 215, 0, 0.3);
+}
+
+/* ==================== 游戏容器 ==================== */
+.game-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: linear-gradient(180deg, var(--bg-primary) 0%, var(--bg-dark) 100%);
+}
+
+/* ==================== 顶部统计栏 ==================== */
+.stats-bar {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 15px 20px;
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    border-bottom: 2px solid var(--accent-gold);
+    box-shadow: var(--shadow-gold);
+    z-index: 100;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 5px 15px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 3px;
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: bold;
+    color: var(--accent-gold);
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+}
+
+.stat-value.gold-update {
+    animation: goldPulse 0.2s ease-out;
+}
+
+@keyframes goldPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); color: #fff; }
+    100% { transform: scale(1); }
+}
+
+/* ==================== 主游戏区域 ==================== */
+.game-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ==================== 左侧面板 - 英雄列表 ==================== */
+.hero-panel {
+    width: 300px;
+    background: rgba(0, 0, 0, 0.3);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.panel-header {
+    padding: 15px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.panel-title {
+    font-size: 18px;
+    color: var(--accent-gold);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.hero-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+/* 滚动条样式 */
+.hero-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.hero-list::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+}
+
+.hero-list::-webkit-scrollbar-thumb {
+    background: var(--accent-gold-dark);
+    border-radius: 4px;
+}
+
+/* 英雄卡片 */
+.hero-card {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, rgba(45, 27, 78, 0.8) 0%, rgba(26, 18, 37, 0.8) 100%);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.hero-card:hover {
+    background: linear-gradient(135deg, rgba(45, 27, 78, 1) 0%, rgba(26, 18, 37, 1) 100%);
+    border-color: var(--accent-gold);
+    transform: translateX(5px);
+    box-shadow: var(--shadow-gold);
+}
+
+.hero-card.selected {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+.hero-card.can-afford {
+    border-color: var(--hp-green);
+}
+
+.hero-card.can-afford:hover {
+    box-shadow: 0 0 10px rgba(46, 204, 113, 0.4);
+}
+
+.hero-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: bold;
+    color: #fff;
+    margin-right: 12px;
+    border: 2px solid var(--accent-gold);
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.hero-info {
+    flex: 1;
+}
+
+.hero-name {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: 3px;
+}
+
+.hero-level {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.hero-dps {
+    font-size: 11px;
+    color: var(--accent-gold);
+}
+
+.hero-buy-btn {
+    padding: 8px 15px;
+    background: linear-gradient(180deg, var(--accent-gold) 0%, var(--accent-gold-dark) 100%);
+    border: none;
+    border-radius: 5px;
+    color: var(--bg-dark);
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.hero-buy-btn:hover:not(:disabled) {
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.hero-buy-btn:disabled {
+    background: #555;
+    color: #888;
+    cursor: not-allowed;
+}
+
+/* ==================== 中央怪物区域 ==================== */
+.monster-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.monster-info {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    z-index: 10;
+}
+
+.monster-name {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--text-primary);
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.8);
+    margin-bottom: 5px;
+}
+
+.monster-level {
+    font-size: 14px;
+    color: var(--accent-gold);
+}
+
+#monster-canvas {
+    flex: 1;
+    width: 100%;
+    cursor: crosshair;
+}
+
+/* HP条 */
+.hp-bar-container {
+    width: 60%;
+    max-width: 500px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 12px;
+    border: 2px solid #4a4a4a;
+    overflow: hidden;
+    margin: 20px auto;
+    position: relative;
+}
+
+.hp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--hp-green) 0%, var(--hp-yellow) 50%, var(--hp-red) 100%);
+    transition: width 0.2s ease-out;
+    position: relative;
+}
+
+.hp-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, transparent 100%);
+}
+
+.hp-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 14px;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ==================== 右侧面板 - 升级详情 ==================== */
+.upgrade-panel {
+    width: 280px;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.upgrade-title {
+    font-size: 18px;
+    color: var(--accent-gold);
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.selected-hero-details {
+    background: rgba(45, 27, 78, 0.5);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.detail-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.detail-value {
+    color: var(--accent-gold);
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.buy-section {
+    margin-top: 20px;
+}
+
+.cost-display {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.cost-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.cost-value {
+    font-size: 24px;
+    color: var(--accent-gold);
+    font-weight: bold;
+}
+
+.btn-buy {
+    width: 100%;
+    padding: 15px;
+    background: linear-gradient(180deg, var(--hp-green) 0%, #27ae60 100%);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+.btn-buy:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 20px rgba(46, 204, 113, 0.4);
+}
+
+.btn-buy:disabled {
+    background: #555;
+    cursor: not-allowed;
+}
+
+/* ==================== 底部控制栏 ==================== */
+.control-bar {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 15px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-control {
+    padding: 10px 25px;
+    background: transparent;
+    border: 2px solid var(--accent-gold);
+    border-radius: 25px;
+    color: var(--accent-gold);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-control:hover {
+    background: var(--accent-gold);
+    color: var(--bg-dark);
+    box-shadow: var(--shadow-gold);
+}
+
+/* ==================== 模态框 ==================== */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal.show {
+    display: flex;
+}
+
+.modal-content {
+    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    border: 2px solid var(--accent-gold);
+    border-radius: 15px;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+    font-size: 24px;
+    color: var(--accent-gold);
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 28px;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.modal-close:hover {
+    color: var(--accent-gold);
+}
+
+.modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+/* 设置面板样式 */
+.settings-section {
+    margin-bottom: 25px;
+}
+
+.settings-section h3 {
+    color: var(--accent-gold);
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.setting-item span {
+    color: var(--text-primary);
+}
+
+.setting-item input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: var(--accent-gold);
+}
+
+/* 成就列表样式 */
+.achievements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.achievement-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.achievement-item.locked {
+    opacity: 0.5;
+}
+
+.achievement-item.unlocked {
+    border-color: var(--accent-gold);
+    background: rgba(255, 215, 0, 0.1);
+}
+
+.achievement-icon {
+    font-size: 32px;
+    margin-right: 15px;
+}
+
+.achievement-info {
+    flex: 1;
+}
+
+.achievement-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.achievement-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-right: 10px;
+}
+
+.btn-primary {
+    background: var(--accent-gold);
+    color: var(--bg-dark);
+}
+
+.btn-primary:hover {
+    background: #ffed4a;
+}
+
+.btn-danger {
+    background: var(--hp-red);
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: #c0392b;
+}
+
+/* ==================== 通知消息 ==================== */
+.notification {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-100px);
+    padding: 15px 30px;
+    border-radius: 8px;
+    font-weight: bold;
+    z-index: 2000;
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.notification.show {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+}
+
+.notification-success {
+    background: var(--hp-green);
+    color: #fff;
+}
+
+.notification-error {
+    background: var(--hp-red);
+    color: #fff;
+}
+
+.notification-warning {
+    background: var(--hp-yellow);
+    color: var(--bg-dark);
+}
+
+.notification-info {
+    background: var(--accent-gold);
+    color: var(--bg-dark);
+}
+
+/* ==================== 响应式设计 ==================== */
+@media (max-width: 1200px) {
+    .hero-panel {
+        width: 250px;
+    }
+    
+    .upgrade-panel {
+        width: 240px;
+    }
+}
+
+@media (max-width: 992px) {
+    .game-main {
+        flex-direction: column;
+    }
+    
+    .hero-panel {
+        width: 100%;
+        height: 200px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .hero-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .hero-card {
+        width: calc(50% - 5px);
+        margin-bottom: 0;
+    }
+    
+    .upgrade-panel {
+        width: 100%;
+        height: 150px;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .monster-area {
+        min-height: 300px;
+    }
+}
+
+@media (max-width: 576px) {
+    .stats-bar {
+        flex-wrap: wrap;
+        padding: 10px;
+    }
+    
+    .stat-item {
+        padding: 5px 10px;
+    }
+    
+    .stat-value {
+        font-size: 16px;
+    }
+    
+    .hero-card {
+        width: 100%;
+    }
+    
+    .monster-name {
+        font-size: 18px;
+    }
+    
+    .modal-content {
+        width: 95%;
+        margin: 10px;
+    }
+}
+
+/* ==================== 动画效果 ==================== */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.shake-animation {
+    animation: shake 0.3s ease-in-out;
+}
+
+/* ==================== 工具类 ==================== */
+.hidden {
+    display: none !important;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.text-gold {
+    color: var(--accent-gold);
+}
+
+.text-green {
+    color: var(--hp-green);
+}
+
+.text-red {
+    color: var(--hp-red);
+}
